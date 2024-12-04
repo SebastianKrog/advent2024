@@ -1,6 +1,7 @@
 library(tidyverse)
 
 # DAY 1
+
 d1 <- read_table("data/day_1/input.txt", col_names = c("list_1", "list_2"))
 
 # Pair up the smallest number in the left list with the smallest number in 
@@ -15,8 +16,6 @@ d1_list_2 <- d1$list_2[order(d1$list_2)]
 
 d1_1_answer <- sum(abs(d1_list_1-d1_list_2))
 d1_1_answer
-
-# DAY 1 Task 2
 
 # Calculate a total similarity score by adding up each number in the left 
 # list after multiplying it by the number of times that number appears 
@@ -37,6 +36,7 @@ d1_2_answer
 
 
 # DAY 2
+
 d2_cols <- c("x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8")
 d2 <- read_table("data/day_2/input.txt", col_names = d2_cols) %>% 
   mutate(
@@ -67,7 +67,8 @@ find_safe <- function(df_long) {
 
 d2_safe <- find_safe(d2_long)
 
-d1_1_answer <- d2_safe %>% distinct(row, safe) %>% pull(safe) %>% sum()
+d2_1_answer <- d2_safe %>% distinct(row, safe) %>% pull(safe) %>% sum()
+d2_1_answer
 
 # The Problem Dampener is a reactor-mounted module that lets the reactor 
 # safety systems tolerate a single bad level in what would otherwise be
@@ -95,11 +96,15 @@ d2_new_safe <- d2_collect %>%
     any(safe_x1, safe_x2, safe_x3, safe_x4, safe_x5, safe_x6, safe_x7, safe_x8)
 ) %>% distinct(row, safe)
 
-d1_2_answer <-   d1_1_answer + d2_new_safe %>% pull(safe) %>% sum()
-d1_2_answer
+d2_2_answer <-d2_1_answer + d2_new_safe %>% pull(safe) %>% sum()
+d2_2_answer
 
 
 # DAY 3
+
+d3_file <- readLines("data/day_3/input.txt") |> paste(collapse = " ")
+# Collapsed with space and not newline, since we later match to the start
+# of string.
 
 # It seems like the goal of the program is just to multiply some numbers. 
 # It does that with instructions like mul(X,Y), where X and Y are each 1-3 
@@ -114,16 +119,11 @@ d1_2_answer
 # Scan the corrupted memory for uncorrupted mul instructions. What do you get 
 # if you add up all of the results of the multiplications?
 
-d3_file <- readLines("data/day_3/input.txt") |> paste(collapse = " ")
-# Collapsed with space and not newline, since we later match to the start
-# of string.
-
 d3_regex <- "mul\\((\\d{1,3}),(\\d{1,3})\\)"
 
 matches_to_table <- function(match_list) {
   match_list |> data.frame() %>% 
     as.tibble() |> transmute(
-      fun = "mut",
       arg1 = as.numeric(X2),
       arg2 = as.numeric(X3)
     )
@@ -146,3 +146,55 @@ d3_do_matches <- str_match_all(paste(d3_dos, collapse = ""), d3_regex) %>%
 
 d3_2_answer <- d3_do_matches %>% summarise(sum(arg1*arg2)) %>% as.numeric()
 d3_2_answer
+
+
+# DAY 4
+
+d4 <- readLines("data/day_4/input.txt") |> paste(collapse=" ")
+
+# As the search for the Chief continues, a small Elf who lives on the station 
+# tugs on your shirt; she'd like to know if you could help her with her word
+# search (your puzzle input). She only has to find one word: XMAS.
+
+# This word search allows words to be horizontal, vertical, diagonal, written 
+# backwards, or even overlapping other words. It's a little unusual, though, as
+# you don't merely need to find one instance of XMAS - you need to find all 
+# of them.
+
+count_matches <- function(string, regex) {
+  str_extract_all(string, regex)[[1]] |> length()
+}
+
+combine_regex <- function(...) { paste(..., sep="|") }
+
+d4_horizontal <- count_matches(d4, combine_regex("X(?=MAS)", "S(?=AMX)"))
+
+# Magic number of 140 = line length.
+# E.g. readLines("data/day_4/input.txt")[[1]] |> nchar()
+d4_vertical <- count_matches(d4, combine_regex(
+  "X(?=.{140}M.{140}A.{140}S)",
+  "S(?=.{140}A.{140}M.{140}X)"
+))
+
+d4_vert_right <- count_matches(d4, combine_regex(
+  "X(?=.{141}M.{141}A.{141}S)",
+  "S(?=.{141}A.{141}M.{141}X)"
+))
+
+d4_vert_left <- count_matches(d4, combine_regex(
+  "X(?=.{139}M.{139}A.{139}S)",
+  "S(?=.{139}A.{139}M.{139}X)"
+))
+
+d4_1_answer <- sum(d4_horizontal, d4_vertical, d4_vert_right, d4_vert_left)
+d4_1_answer
+
+# Looking for the instructions, you flip over the word search to find that this 
+# isn't actually an XMAS puzzle; it's an X-MAS puzzle in which you're supposed 
+# to find two MAS in the shape of an X.
+
+d4_2_answer <- count_matches(d4, combine_regex(
+  "M(?=.(M.{139}A.{139}S|S.{139}A.{139}M).S)",
+  "S(?=.(M.{139}A.{139}S|S.{139}A.{139}M).M)"
+))
+d4_2_answer
