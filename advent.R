@@ -198,3 +198,163 @@ d4_2_answer <- count_matches(d4, combine_regex(
   "S(?=.(M.{139}A.{139}S|S.{139}A.{139}M).M)"
 ))
 d4_2_answer
+
+
+# DAY5
+
+d5 <- readLines("data/day_5/input.txt")
+
+# Safety protocols clearly indicate that new pages for the safety manuals must
+# be printed in a very specific order. The notation X|Y means that if both page
+# number X and page number Y are to be produced as part of an update, page
+# number X must be printed at some point before page number Y.
+
+# The Elf has for you both the page ordering rules and the pages to produce in
+# each update (your puzzle input), but can't figure out whether each update has
+# the pages in the right order.
+
+d5_split <- which(d5 == "")
+d5_page_rules_list <- d5[1:(d5_split-1)]
+
+d5_page_rules <- hashtab()
+add_page_rule <- function(page_rule_str) {
+  pr <- as.numeric(str_match(page_rule_str,"(\\d+)\\|(\\d+)")[,2:3])
+  d5_page_rules[[pr[2]]] <- unique(c(d5_page_rules[[pr[2], nomatch=c()]], pr[1]))
+}
+
+walk(d5_page_rules_list, add_page_rule)
+
+d5_updates <- lapply(d5[(d5_split+1):length(d5)] |> strsplit(","), as.numeric)
+
+check_update_allowed <- function(update) {
+  .check_update_allowed <- function(upd) {
+    if(length(upd) <= 1) { return(T) }
+    car <- head(upd, 1)
+    cdr <- tail(upd, -1)
+    all(
+      !(d5_page_rules[[car, nomatch=c()]] %in% cdr),
+      .check_update_allowed(cdr)
+    )
+  }
+  if (.check_update_allowed(update)) { 
+    return(update[[ceiling(length(update)/2)]]) 
+  }
+  return(0)
+}
+
+d5_allowed_updates <- sapply(d5_updates, check_update_allowed)
+
+d5_1_answer <- sum(d5_allowed_updates)
+
+# For each of the incorrectly-ordered updates, use the page ordering rules to
+# put the page numbers in the right order. 
+
+# Find the updates which are not in the correct order. What do you get if you
+# add up the middle page numbers after correctly ordering just those updates?
+
+d5_incorrect <- d5_updates[which(d5_allowed_updates==0)]
+
+fix_incorrect_update <- function(update) {
+  .find_correct_element <- function(upd) {
+    if(length(upd) == 1) { return(upd) }
+    
+    for (el in upd) {
+      illegal <- d5_page_rules[[el, nomatch=c()]] %in% upd
+      if (!any(illegal)) { return( el )}
+    }
+  }
+   
+  order <- c()
+  subset <- update
+  for (i in 1:length(update)) {
+    next_el <- .find_correct_element(subset)
+    order <- c(order, next_el)
+    subset <- subset[! subset %in% next_el]
+  }
+  return(order[[ceiling(length(order)/2)]]) 
+}
+
+d5_2_answer <- sum(sapply(d5_incorrect, fix_incorrect_update))
+
+
+# Day 6
+
+
+# DAY 7
+
+d7 <- readLines("data/day_7/input.txt")
+
+# Each line represents a single equation. The test value appears before the
+# colon on each line; it is your job to determine whether the remaining numbers
+# can be combined with operators to produce the test value.
+
+# Operators are always evaluated left-to-right, not according to precedence
+# rules. Furthermore, numbers in the equations cannot be rearranged. Glancing
+# into the jungle, you can see elephants holding two different types of
+# operators: add (+) and multiply (*).
+
+# Determine which equations could possibly be true. What is their total
+# calibration result?
+
+test_line <- d7[[1]]
+
+d7_eqs <- str_match_all(d7 |> paste(collapse="\n"),
+                        "(?<testValue>\\d+): (?<numbers>(\\d+ ?)*)")
+
+d7_test_values <- as.numeric(d7_eqs[[1]][,2])
+
+d7_numbers <- d7_eqs[[1]][,3]
+d7_numbers <- lapply(d7_numbers, function(v) { 
+  as.numeric(str_split(v, " ")[[1]]) } )
+
+find_equation <- function(test_value, numbers) {
+  .find_eq <- function(cur_val, nums) {
+    if ( length(nums) == 0 ) {
+      return(cur_val == test_value)
+    }
+    
+    if ( cur_val > test_value ) { return(F) }
+    
+    any(
+      .find_eq(cur_val + head(nums, 1), tail(nums, -1)),
+      .find_eq(cur_val * head(nums, 1), tail(nums, -1)),
+    )
+  }
+  .find_eq(0, numbers)
+}
+
+# Warning, long run time ~20 sec
+d7_valid <- mapply(find_equation, d7_test_values, d7_numbers)
+
+d7_1_answer <- sum(d7_test_values[which(d7_valid)])
+
+# The concatenation operator (||) combines the digits from its left and right
+# inputs into a single number. For example, 12 || 345 would become 12345.
+# All operators are still evaluated left-to-right.
+
+concat_numbers <- function(numbers) {
+  as.numeric(paste(as.character(numbers), collapse = ""))
+}
+
+find_equation2 <- function(test_value, numbers) {
+  .find_eq <- function(nums) {
+    if ( length(nums) == 1 ) {
+      return(nums == test_value)
+    }
+    
+    if ( sum(nums) > test_value + 1 ) { return(F) }
+    
+    any(
+      .find_eq(c(sum(head(nums, 2)), tail(nums, -2))),
+      .find_eq(c(prod(head(nums, 2)), tail(nums, -2))),
+      .find_eq(c(concat_numbers(head(nums, 2)), tail(nums, -2)))
+    )
+  }
+  
+  .find_eq(numbers)
+}
+
+# Warning, LONG run time (couple of minutes on laptop)
+d7_2_valid <- mapply(find_equation2, d7_test_values, d7_numbers)
+
+d7_2_answer <- sum(d7_test_values[which(d7_2_valid)])
