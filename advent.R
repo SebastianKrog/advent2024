@@ -313,23 +313,32 @@ for (i in 1:length(d6_input)) {
 
 d6 <- tibble(x=d6_x, y=d6_y)
 
-d6_find_path <- function(df) {
+shifter <- function(x, n = 1) {
+  if (n == 0) x else c(tail(x, -n), head(x, n))
+}
+
+d6_find_path <- function(df, shift=0) {
   found_exit <- F
   looping <- F
-  directions <- c("up", "right", "down", "left")
+  directions <- shifter(c("up", "right", "down", "left"), shift)
   i <- 0
-  l <- list(d6_start)
+  l_x <- rep(NA, 200)
+  l_y <- rep(NA, 200)
+  l_x[[1]] <- d6_start$x
+  l_y[[1]] <- d6_start$y
   while(!found_exit & !looping) {
     dir <- directions[(i %% 4) + 1]
     i <- i + 1
     
-    start <- tail(l, 1)[[1]]
+    start <- list(x=l_x[[i]], y=l_y[[i]])
     if (dir == "up") {
       next_obstacle <- df %>% filter(x==start$x, y<start$y) %>% pull(y)
       if (length(next_obstacle) > 0) {
-        new_point <- list(list(x=start$x, y=max(next_obstacle)+1))
+        new_x <- start$x
+        new_y <- max(next_obstacle)+1
       } else {
-        new_point <- list(list(x=start$x, y=1)) 
+        new_x <- start$x
+        new_y <- 1
         found_exit <- T
       }
     }
@@ -337,9 +346,11 @@ d6_find_path <- function(df) {
     if (dir == "right") {
       next_obstacle <- df %>% filter(x>start$x, y==start$y) %>% pull(x)
       if (length(next_obstacle) > 0) {
-        new_point <- list(list(y=start$y, x=min(next_obstacle)-1))
+        new_x <- min(next_obstacle)-1
+        new_y <- start$y
       } else {
-        new_point <- list(list(y=start$y, x=d6_bounds[[1]]))
+        new_x <- d6_bounds[[1]]
+        new_y <- start$y
         found_exit <- T
       }
     }
@@ -347,9 +358,11 @@ d6_find_path <- function(df) {
     if (dir == "down") {
       next_obstacle <- df %>% filter(x==start$x, y>start$y) %>% pull(y)
       if (length(next_obstacle) > 0) {
-        new_point <- list(list(x=start$x, y=min(next_obstacle)-1))
+        new_x <- start$x
+        new_y <- min(next_obstacle)-1
       } else {
-        new_point <- list(list(x=start$x, y=d6_bounds[[2]]))
+        new_x <- start$x
+        new_y <- d6_bounds[[2]]
         found_exit <- T
       }
     }
@@ -357,38 +370,50 @@ d6_find_path <- function(df) {
     if (dir == "left") {
       next_obstacle <- df %>% filter(x<start$x, y==start$y) %>% pull(x)
       if (length(next_obstacle) > 0) {
-        new_point <- list(list(y=start$y, x=max(next_obstacle)+1))
+        new_x <- max(next_obstacle)+1
+        new_y <- start$y
       } else {
-        new_point <- list(list(y=start$y, x=1))     
+        new_x <- 1
+        new_y <- start$y
         found_exit <- T
       }
     }
     
-    if (new_point %in% l) {
+    if ( sum((new_x == l_x) & (new_y == l_y), na.rm = T) >= 2 ) {
       looping <- T
     }
     
-    l <- append(l, new_point)
+    l_x[[i+1]] <- new_x
+    l_y[[i+1]] <- new_y
   }
   if (looping) { return(T) }
-  l
+  list(x=l_x[!is.na(l_x)], y=l_y[!is.na(l_y)])
 }
 
 d6_path <- d6_find_path(d6)
 
-d6_lines <- unnest_wider(tibble(d6_path), d6_path)
+d6_lines <- tibble(x=d6_path$x, y=d6_path$y)
 
 d6_lines <- d6_lines %>% 
   mutate(
     lag_x = lag(x),
-    lag_y = lag(y)
+    lag_y = lag(y),
+    delta_x = x-lag_x,
+    delta_y = y-lag_y,
+    dir = case_when(
+      delta_x > 0 ~ "right",
+      delta_x < 0 ~ "left",
+      delta_y > 0 ~ "down",
+      delta_y < 0 ~ "up",
+      T~NA
+    )
   ) %>% filter(!is.na(lag_x)) %>% 
   rowwise() %>% mutate(
     positions = list(data.frame(x=lag_x:x,y=lag_y:y))
   )
 
 d6_positions <- d6_lines %>% 
-  select(positions) %>% unnest(positions) %>% distinct(x,y)
+  select(positions, dir, delta_x, delta_y) %>% unnest(positions) %>% distinct(x,y)
 
 d6_1_answer <- d6_positions %>% count()
 
@@ -396,15 +421,21 @@ d6_1_answer <- d6_positions %>% count()
 # How many different positions could you choose for this obstruction?
 
 # We only check positions that are actually traveled
-d6_check_pos <- d6_positions %>% filter(!(x == d6_start$x & y == d6_start$y))
+d6_check_pos <- d6_positions %>% filter(
+  !(x == d6_start$x & y == d6_start$y),
+  !(x == d6_start$x & y == d6_start$y+1)
+)
 
-n_check <- 40#nrow(d6_check_pos)
+# Takes around 13 minutes to arrive at the wrong answer. Yikes.
+n_check <- nrow(d6_check_pos)
 d6_looping <- rep(F, n_check)
+cli::cli_progress_bar("Progress", total = n_check)
 for (i in 1:n_check) {
   path <- d6_find_path(d6 %>% add_row(
     x = d6_check_pos$x[[i]], 
     y = d6_check_pos$y[[i]]))
   d6_looping[[i]] <- is_logical(path)
+  cli::cli_progress_update()
 }
 
 d6_2_answer <- sum(d6_looping)
@@ -490,3 +521,8 @@ find_equation2 <- function(test_value, numbers) {
 d7_2_valid <- mapply(find_equation2, d7_test_values, d7_numbers)
 
 d7_2_answer <- sum(d7_test_values[which(d7_2_valid)])
+
+
+# DAY 8
+
+
