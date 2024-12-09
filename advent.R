@@ -279,6 +279,138 @@ d5_2_answer <- sum(sapply(d5_incorrect, fix_incorrect_update))
 
 # Day 6
 
+d6_test <- "....#.....
+.........#
+..........
+..#.......
+.......#..
+..........
+.#..^.....
+........#.
+#.........
+......#..."
+
+d6_input <- readLines("data/day_6/input.txt")
+
+d6_input <- str_split_1(d6_test, "\n")
+
+d6_bounds <- c(nchar(d6_input[1]),length(d6_input))
+
+d6_x <- c()
+d6_y <- c()
+d6_start <- c()
+for (i in 1:length(d6_input)) {
+  matches <- unlist(gregexpr('#', d6_input[i]))
+  if ( ! -1 %in% matches) {
+    d6_x <- c(d6_x, matches)
+    d6_y <- c(d6_y, rep(i, length(matches)))
+  }
+  start <- unlist(gregexpr('\\^', d6_input[i]))
+  if (start != -1) {
+    d6_start <- list(x=start, y=i)
+  }
+}
+
+d6 <- tibble(x=d6_x, y=d6_y)
+
+d6_find_path <- function(df) {
+  found_exit <- F
+  looping <- F
+  directions <- c("up", "right", "down", "left")
+  i <- 0
+  l <- list(d6_start)
+  while(!found_exit & !looping) {
+    dir <- directions[(i %% 4) + 1]
+    i <- i + 1
+    
+    start <- tail(l, 1)[[1]]
+    if (dir == "up") {
+      next_obstacle <- df %>% filter(x==start$x, y<start$y) %>% pull(y)
+      if (length(next_obstacle) > 0) {
+        new_point <- list(list(x=start$x, y=max(next_obstacle)+1))
+      } else {
+        new_point <- list(list(x=start$x, y=1)) 
+        found_exit <- T
+      }
+    }
+    
+    if (dir == "right") {
+      next_obstacle <- df %>% filter(x>start$x, y==start$y) %>% pull(x)
+      if (length(next_obstacle) > 0) {
+        new_point <- list(list(y=start$y, x=min(next_obstacle)-1))
+      } else {
+        new_point <- list(list(y=start$y, x=d6_bounds[[1]]))
+        found_exit <- T
+      }
+    }
+    
+    if (dir == "down") {
+      next_obstacle <- df %>% filter(x==start$x, y>start$y) %>% pull(y)
+      if (length(next_obstacle) > 0) {
+        new_point <- list(list(x=start$x, y=min(next_obstacle)-1))
+      } else {
+        new_point <- list(list(x=start$x, y=d6_bounds[[2]]))
+        found_exit <- T
+      }
+    }
+    
+    if (dir == "left") {
+      next_obstacle <- df %>% filter(x<start$x, y==start$y) %>% pull(x)
+      if (length(next_obstacle) > 0) {
+        new_point <- list(list(y=start$y, x=max(next_obstacle)+1))
+      } else {
+        new_point <- list(list(y=start$y, x=1))     
+        found_exit <- T
+      }
+    }
+    
+    if (new_point %in% l) {
+      looping <- T
+    }
+    
+    l <- append(l, new_point)
+  }
+  if (looping) { return(T) }
+  l
+}
+
+d6_path <- d6_find_path(d6)
+
+d6_lines <- unnest_wider(tibble(d6_path), d6_path)
+
+d6_lines <- d6_lines %>% 
+  mutate(
+    lag_x = lag(x),
+    lag_y = lag(y)
+  ) %>% filter(!is.na(lag_x)) %>% 
+  rowwise() %>% mutate(
+    positions = list(data.frame(x=lag_x:x,y=lag_y:y))
+  )
+
+d6_positions <- d6_lines %>% 
+  select(positions) %>% unnest(positions) %>% distinct(x,y)
+
+d6_1_answer <- d6_positions %>% count()
+
+# You need to get the guard stuck in a loop by adding a single new obstruction.
+# How many different positions could you choose for this obstruction?
+
+# We only check positions that are actually traveled
+d6_check_pos <- d6_positions %>% filter(!(x == d6_start$x & y == d6_start$y))
+
+n_check <- 40#nrow(d6_check_pos)
+d6_looping <- rep(F, n_check)
+for (i in 1:n_check) {
+  path <- d6_find_path(d6 %>% add_row(
+    x = d6_check_pos$x[[i]], 
+    y = d6_check_pos$y[[i]]))
+  d6_looping[[i]] <- is_logical(path)
+}
+
+d6_2_answer <- sum(d6_looping)
+
+d6_check_pos$loop <- d6_looping
+
 
 # DAY 7
 
