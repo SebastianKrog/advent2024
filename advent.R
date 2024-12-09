@@ -317,75 +317,58 @@ shifter <- function(x, n = 1) {
   if (n == 0) x else c(tail(x, -n), head(x, n))
 }
 
-d6_find_path <- function(df, shift=0) {
+d6_find_path <- function(df, shift=0, start_x=d6_start$x, start_y=d6_start$y) {
   found_exit <- F
   looping <- F
-  directions <- shifter(c("up", "right", "down", "left"), shift)
+  directions <- shifter(c("u", "r", "d", "l"), shift)
   i <- 0
   l_x <- rep(NA, 200)
   l_y <- rep(NA, 200)
-  l_x[[1]] <- d6_start$x
-  l_y[[1]] <- d6_start$y
+  l_x[[1]] <- start_x
+  l_y[[1]] <- start_y
   while(!found_exit & !looping) {
     dir <- directions[(i %% 4) + 1]
     i <- i + 1
     
     start <- list(x=l_x[[i]], y=l_y[[i]])
-    if (dir == "up") {
-      next_obstacle <- df %>% filter(x==start$x, y<start$y) %>% pull(y)
-      if (length(next_obstacle) > 0) {
-        new_x <- start$x
-        new_y <- max(next_obstacle)+1
-      } else {
-        new_x <- start$x
-        new_y <- 1
-        found_exit <- T
-      }
+    if (dir == "u") {
+      new_x <- l_x[[i]]
+      new_y <- max(pull(filter(df, x==l_x[[i]], y<l_y[[i]]), y)+1, 1)
     }
     
-    if (dir == "right") {
-      next_obstacle <- df %>% filter(x>start$x, y==start$y) %>% pull(x)
-      if (length(next_obstacle) > 0) {
-        new_x <- min(next_obstacle)-1
-        new_y <- start$y
-      } else {
-        new_x <- d6_bounds[[1]]
-        new_y <- start$y
-        found_exit <- T
-      }
+    if (dir == "r") {
+      new_x <- min(pull(filter(df, x>l_x[[i]], y==l_y[[i]]), x)-1, d6_bounds[[1]])
+      new_y <- l_y[[i]]
     }
     
-    if (dir == "down") {
-      next_obstacle <- df %>% filter(x==start$x, y>start$y) %>% pull(y)
-      if (length(next_obstacle) > 0) {
-        new_x <- start$x
-        new_y <- min(next_obstacle)-1
-      } else {
-        new_x <- start$x
-        new_y <- d6_bounds[[2]]
-        found_exit <- T
-      }
+    if (dir == "d") {
+      new_x <- l_x[[i]]
+      new_y <- min(pull(filter(df, x==l_x[[i]], y>l_y[[i]]), y)-1, d6_bounds[[2]])
     }
     
-    if (dir == "left") {
-      next_obstacle <- df %>% filter(x<start$x, y==start$y) %>% pull(x)
-      if (length(next_obstacle) > 0) {
-        new_x <- max(next_obstacle)+1
-        new_y <- start$y
-      } else {
-        new_x <- 1
-        new_y <- start$y
-        found_exit <- T
-      }
+    if (dir == "l") {
+      new_x <- max(pull(filter(df, x<l_x[[i]], y==l_y[[i]]), x)+1, 1)
+      new_y <- l_y[[i]]
     }
     
-    if ( sum((new_x == l_x) & (new_y == l_y), na.rm = T) >= 2 ) {
+    if ( sum((new_x == l_x) & (new_y == l_y), na.rm = T) >= 3 ) {
       looping <- T
+    }
+    
+    if (any(
+      new_x == 1,
+      new_y == 1,
+      new_x == d6_bounds[[1]],
+      new_y == d6_bounds[[2]]
+    )) {
+      found_exit <- T
     }
     
     l_x[[i+1]] <- new_x
     l_y[[i+1]] <- new_y
+    
   }
+  
   if (looping) { return(T) }
   list(x=l_x[!is.na(l_x)], y=l_y[!is.na(l_y)])
 }
@@ -397,23 +380,14 @@ d6_lines <- tibble(x=d6_path$x, y=d6_path$y)
 d6_lines <- d6_lines %>% 
   mutate(
     lag_x = lag(x),
-    lag_y = lag(y),
-    delta_x = x-lag_x,
-    delta_y = y-lag_y,
-    dir = case_when(
-      delta_x > 0 ~ "right",
-      delta_x < 0 ~ "left",
-      delta_y > 0 ~ "down",
-      delta_y < 0 ~ "up",
-      T~NA
-    )
+    lag_y = lag(y)
   ) %>% filter(!is.na(lag_x)) %>% 
   rowwise() %>% mutate(
     positions = list(data.frame(x=lag_x:x,y=lag_y:y))
   )
 
 d6_positions <- d6_lines %>% 
-  select(positions, dir, delta_x, delta_y) %>% unnest(positions) %>% distinct(x,y)
+  select(positions) %>% unnest(positions) %>% distinct(x,y)
 
 d6_1_answer <- d6_positions %>% count()
 
@@ -422,25 +396,39 @@ d6_1_answer <- d6_positions %>% count()
 
 # We only check positions that are actually traveled
 d6_check_pos <- d6_positions %>% filter(
-  !(x == d6_start$x & y == d6_start$y),
-  !(x == d6_start$x & y == d6_start$y+1)
+  #!(x == d6_start$x & y == d6_start$y)
 )
 
-# Takes around 13 minutes to arrive at the wrong answer. Yikes.
+# Takes around 13 minutes
 n_check <- nrow(d6_check_pos)
 d6_looping <- rep(F, n_check)
 cli::cli_progress_bar("Progress", total = n_check)
 for (i in 1:n_check) {
-  path <- d6_find_path(d6 %>% add_row(
-    x = d6_check_pos$x[[i]], 
-    y = d6_check_pos$y[[i]]))
-  d6_looping[[i]] <- is_logical(path)
+  if (d6_check_pos$y[[i]] > d6_check_pos$y[[i+1]]) shift <- 0 #u -> r
+  if (d6_check_pos$x[[i]] < d6_check_pos$x[[i+1]]) shift <- 1 #r
+  if (d6_check_pos$y[[i]] < d6_check_pos$y[[i+1]]) shift <- 2 #d
+  if (d6_check_pos$x[[i]] > d6_check_pos$x[[i+1]]) shift <- 3 #l
+  path <- d6_find_path(
+    d6 %>% 
+      add_row(
+        x = d6_check_pos$x[[i+1]], 
+        y = d6_check_pos$y[[i+1]]),
+    shift=shift,
+    start_x=d6_check_pos$x[[i]],
+    start_y=d6_check_pos$y[[i]])
+  #cli::cli_alert(paste("start", d6_check_pos$x[[i]], d6_check_pos$y[[i]], 
+  #                     "pos", d6_check_pos$x[[i+1]], d6_check_pos$y[[i+1]],
+  #                     "shift", shift, "loop", is_logical(path)))
+  d6_looping[[i+1]] <- is_logical(path)
   cli::cli_progress_update()
+  if (i == n_check-1) break
 }
 
+sum(d6_looping)
 d6_2_answer <- sum(d6_looping)
 
 d6_check_pos$loop <- d6_looping
+View(d6_check_pos)
 
 
 # DAY 7
