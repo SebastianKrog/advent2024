@@ -5,6 +5,24 @@ source("utils.R")
 
 d9_input <- readLines("data/day_9/input.txt")
 
+# He shows you the disk map (your puzzle input) he's already generated.
+
+# The disk map uses a dense format to represent the layout of files and free 
+# space on the disk. The digits alternate between indicating the length of a 
+# file and the length of free space.
+
+# Each file on disk also has an ID number based on the order of the files as
+# they appear before they are rearranged, starting with ID 0.
+
+# The amphipod would like to move file blocks one at a time from the end of the
+# disk to the leftmost free space block (until there are no gaps remaining
+# between file blocks).
+
+# The final step of this file-compacting process is to update the filesystem 
+# checksum. To calculate the checksum, add up the result of multiplying each of
+# these blocks' position with the file ID number it contains. The leftmost block
+# is in position 0. If a block contains free space, skip it instead.
+
 #d9_input <- "2333133121414131402"
 
 d9 <- as.numeric(str_split_1(d9_input, ""))
@@ -40,69 +58,51 @@ for(i in 1:nrow(d9_data)) {
 
 d9_1_answer <- checksum
 
-# Part 2
+# The eager amphipod already has a new plan: rather than move individual blocks,
+# he'd like to try compacting the files on his disk by moving whole files
+# instead.
 
-d9_2_df <- d9_df %>% 
-  mutate(
-    moved = F,
-    pos = row_number()
-  )
+# This time, attempt to move whole files to the leftmost span of free space 
+# blocks that could fit the file. Attempt to move each file exactly once in 
+# order of decreasing file ID number starting with the file with the highest 
+# file ID number. If there is no span of free space to the left of a file that 
+# is large enough to fit the file, the file does not move.
 
-reformat_1 <- function(df) {
-  ret_df <- df
+calc_reformat_checksum <- function() {
+  ids <- floor(1:length(d9)/2)
+  space <- d9[c(F, T)]
+  space_pos <- d9_positions[c(F, T)]+1
   
-  # Find next data to move
-  next_data <- df %>% filter(data==T, moved==F) %>% filter(id == max(id))
+  data <- d9[c(T, F)]
+  data_pos <- d9_positions[c(T, F)]+1
+  data_ids <- ids[c(T, F)]
   
-  if (nrow(next_data) == 0) {
-    return(list(df=ret_df, moved=F))
+  build_output <- rep(0, sum(d9))
+  
+  i <- 0
+  while (i < length(data)) {
+    i <- i + 1
+    r <- length(data) - i + 1
+    file <- data[[r]]
+    
+    # Check if there is a space for the file
+    ii <- 1
+    found <- F
+    while (space_pos[[ii]] < data_pos[[r]]) {
+      if (space[[ii]] >= file) {
+        found <- T
+        break
+      }
+      ii <- ii + 1
+    }
+    
+    if (found) build_output[space_pos[[ii]]:(space_pos[[ii]]+file-1)] <- data_ids[[r]]
+    else build_output[data_pos[[r]]:(data_pos[[r]]+file-1)] <- data_ids[[r]]
+    space[[ii]] <- space[[ii]] - file
+    space_pos[[ii]] <- space_pos[[ii]] + file
   }
   
-  next_pos <- min(next_data$pos)
-  next_count <- next_data$count[[1]]
-  next_id <- next_data$id[[1]]
-  
-  # Find first slot to move to
-  slot <- df %>% filter(data==F, pos < next_pos, count >= next_count) %>% 
-    arrange(pos) %>% 
-    slice_head(n=next_count)
-  
-  if (nrow(slot) > 0) {
-    # Remove old data
-    ret_df$id[next_data$pos] <- -1
-    ret_df$data[next_data$pos] <- F
-    
-    # Add new data
-    ret_df$id[slot$pos] <- next_id
-    ret_df$data[slot$pos] <- T
-    ret_df$moved[slot$pos] <- T
-    
-    # Recalculate counts
-    ret_df <- ret_df %>% group_by(data, id) %>% mutate(
-      count = n()
-    ) %>% ungroup()
-  } else {
-    ret_df$moved[next_data$pos] <- T
-  }
-  
-  return(list(df=ret_df, moved=T))
+  sum(build_output * 0:(length(build_output)-1))
 }
 
-d9_2_out <- d9_2_df
-moved <- T
-cli::cli_progress_bar("Reformatting...", total=max(df$id)+1)
-while(moved) {
-  attempt_move <- reformat_1(d9_2_out)
-  d9_2_out <- attempt_move$df
-  moved <- attempt_move$moved
-  cli::cli_progress_update()
-}
-
-d9_2_calc_df <- d9_2_out
-
-d9_2_calc_df <- d9_2_calc_df %>% mutate(
-  check_pos = row_number() -1,
-  check_val = id*check_pos
-)
-
-d9_2_answer <- d9_2_calc_df %>% filter(data==F) %>% pull(check_val) %>% sum()
+d9_2_answer <- calc_reformat_checksum()
