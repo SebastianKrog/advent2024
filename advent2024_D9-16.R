@@ -106,3 +106,72 @@ calc_reformat_checksum <- function() {
 }
 
 d9_2_answer <- calc_reformat_checksum()
+
+
+# Day 10
+
+d10_input <- readLines("data/day_10/input.txt")
+
+d10_input <- "0
+1
+2
+3
+4
+5
+6
+7
+8
+9" |> str_split_1("\n")
+
+d10_input <- "89010123
+78121874
+87430965
+96549874
+45678903
+32019012
+01329801
+10456732" |> str_split_1("\n")
+
+d10 <- read_map(d10_input, fun=as.numeric)
+
+d10_diff <- d10 %>% arrange(x) %>% group_by(y) %>%
+  mutate(
+    right = (lead(symbol) - symbol) == 1,
+    left = (lag(symbol) - symbol) == 1,
+  ) %>% arrange(y) %>% group_by(x) %>%
+  mutate(
+    down = (lead(symbol) - symbol) == 1,
+    up = (lag(symbol) - symbol) == 1,
+  ) %>% ungroup() %>% replace(is.na(.), F) %>% 
+  arrange(desc(symbol)) %>% mutate(
+    score = case_when(
+      symbol == 9 ~ 2^(row_number()-1),
+      T ~ 0
+    )
+  )
+
+for (i in 0:10) {
+  d10_diff <- d10_diff %>% arrange(x) %>% group_by(y) %>%
+    mutate(
+      score = case_when(
+        right ~ bitwOr(score, lead(score)),
+        T ~ score)) %>% 
+    mutate(
+      score = case_when(
+        left ~ bitwOr(score, lag(score)),
+        T ~ score)) %>% arrange(y) %>% group_by(x) %>%
+    mutate(
+      score = case_when(
+        down ~ bitwOr(score, lead(score)),
+        T ~ score)) %>%
+    mutate(
+      score = case_when(
+        up ~ bitwOr(score, lag(score)),
+        T ~ score))
+}
+
+count_bits <- function(n) {
+  sum(as.numeric(intToBits(n)))
+}
+
+d10_diff %>% filter(symbol==0) %>% mutate(total = count_bits(score))
