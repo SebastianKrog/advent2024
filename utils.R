@@ -1,7 +1,6 @@
 
 # Read a string symbol map into x-y cooordinates
-read_map <- function(input, ignore=".", fun=identity) {
-  
+read_map_df <- function(input, ignore=".", fun=identity) {
   max_size <- nchar(input[1])*length(input)
   l_x <- rep(NA, max_size)
   l_y <- rep(NA, max_size)
@@ -27,6 +26,10 @@ read_map <- function(input, ignore=".", fun=identity) {
   tibble(x=l_x, y=l_y, symbol=l_symbol)
 }
 
+read_map_matrix <- function(input, fun=identity) {
+  do.call(rbind, lapply(strsplit(input, ""), fun))
+}
+
 print_map_df <- function(
   df, symbol="symbol", background=".", width=max(df$x), height=max(df$y)) {
   for (y_i in 1:height) {
@@ -38,3 +41,16 @@ print_map_df <- function(
     cat(paste(l, collapse=""), "\n")
   }
 }
+
+reapply <- function(fun, init, n) {
+  if (n == 1) return(fun(init))
+  cli::cli_progress_bar("Reapplying...", total=n)
+  out <- fun(init)
+  for (i in 1:(n-1)) {
+    cli::cli_progress_update()
+    out <- fun(out)
+  }
+  cli::cli_progress_done()
+  out
+}
+

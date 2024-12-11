@@ -112,66 +112,143 @@ d9_2_answer <- calc_reformat_checksum()
 
 d10_input <- readLines("data/day_10/input.txt")
 
-d10_input <- "0
-1
-2
-3
-4
-5
-6
-7
-8
-9" |> str_split_1("\n")
+# d10_input <- "89010123
+# 78121874
+# 87430965
+# 96549874
+# 45678903
+# 32019012
+# 01329801
+# 10456732" |> str_split_1("\n")
 
-d10_input <- "89010123
-78121874
-87430965
-96549874
-45678903
-32019012
-01329801
-10456732" |> str_split_1("\n")
+d10 <- read_map_df(d10_input, fun=as.numeric)
 
-d10 <- read_map(d10_input, fun=as.numeric)
+d10_m <- read_map_matrix(d10_input, fun=as.numeric)
 
-d10_diff <- d10 %>% arrange(x) %>% group_by(y) %>%
-  mutate(
-    right = (lead(symbol) - symbol) == 1,
-    left = (lag(symbol) - symbol) == 1,
-  ) %>% arrange(y) %>% group_by(x) %>%
-  mutate(
-    down = (lead(symbol) - symbol) == 1,
-    up = (lag(symbol) - symbol) == 1,
-  ) %>% ungroup() %>% replace(is.na(.), F) %>% 
-  arrange(desc(symbol)) %>% mutate(
-    score = case_when(
-      symbol == 9 ~ 2^(row_number()-1),
-      T ~ 0
-    )
+d10_th <- d10 %>% filter(symbol == 0)
+
+trailhead_score <- function(x, y, mat, unique = T) {
+  trailhead_count <- function(x, y, value) {
+    if (x <= 0) return(c())
+    if (y <= 0) return(c())
+    if (x > ncol(mat)) return(c())
+    if (y > nrow(mat)) return(c())
+    if (mat[y, x] != value) return(c())
+    if (value == 9) return(x+y*ncol(mat))
+    return(c(
+      trailhead_count(x, y-1, value+1),
+      trailhead_count(x, y+1, value+1),
+      trailhead_count(x+1, y, value+1),
+      trailhead_count(x-1, y, value+1)
+    ))
+  }
+  if (unique) return(length(unique(trailhead_count(x, y, 0))))
+  length(trailhead_count(x, y, 0))
+}
+
+
+d10_th_scores <- mapply(
+  function(x,y) {trailhead_score(x,y,d10_m) },
+  d10_th$x,
+  d10_th$y)
+
+d10_1_answer <- sum(d10_th_scores)
+
+
+# PART 2
+
+d10_th_ratings <- mapply(
+  function(x,y) {trailhead_score(x, y, d10_m, unique=F) },
+  d10_th$x,
+  d10_th$y)
+
+d10_2_answer <- sum(d10_th_ratings)
+
+
+# DAY 11
+
+# As you observe them for a while, you find that the stones have a consistent 
+# behavior. Every time you blink, the stones each simultaneously change 
+# according to the first applicable rule in this list:
+  
+# - If the stone is engraved with the number 0, it is replaced by a stone 
+#     engraved with the number 1.
+# - If the stone is engraved with a number that has an even number of digits, 
+#     it is replaced by two stones. The left half of the digits are engraved on 
+#     the new left stone, and the right half of the digits are engraved on the 
+#     new right stone.
+# - If none of the other rules apply, the stone is replaced by a new stone; the 
+#     old stone's number multiplied by 2024 is engraved on the new stone.
+
+d11 <- "125 17" |> str_split_1(" ") |> as.numeric()
+d11 <- readLines("data/day_11/input.txt") |> str_split_1(" ") |> as.numeric()
+
+n_digits <- function(x) {
+  case_when(
+    x == 0 ~ 1,
+    T ~ floor(log10(x)) + 1
   )
-
-for (i in 0:10) {
-  d10_diff <- d10_diff %>% arrange(x) %>% group_by(y) %>%
-    mutate(
-      score = case_when(
-        right ~ bitwOr(score, lead(score)),
-        T ~ score)) %>% 
-    mutate(
-      score = case_when(
-        left ~ bitwOr(score, lag(score)),
-        T ~ score)) %>% arrange(y) %>% group_by(x) %>%
-    mutate(
-      score = case_when(
-        down ~ bitwOr(score, lead(score)),
-        T ~ score)) %>%
-    mutate(
-      score = case_when(
-        up ~ bitwOr(score, lag(score)),
-        T ~ score))
 }
 
-count_bits <- function(n) {
-  sum(as.numeric(intToBits(n)))
+n_split <- function(x) {
+  # could be faster as floor(n/0.5digits) and (n/0.5digits) %% 1 * 0.5digits
+  str <- as.character(x) |> str_split_1("")
+  c(paste(head(str, length(str)/2), collapse=""),
+    paste(tail(str, length(str)/2), collapse="")) |> as.numeric()
 }
 
-d10_diff %>% filter(symbol==0) %>% mutate(total = count_bits(score))
+n_split_1 <- function(x, digits) {
+  as.integer(floor(x/(10^(digits/2))))
+}
+
+n_split_2 <- function(x, digits) {
+  half_d <- 10^(digits/2)
+  decimal <- x/half_d
+  round(half_d * (decimal - trunc(decimal)))
+}
+
+blink <- function(v) {
+  new_length <- length(v) + sum(n_digits(v) %% 2 == 0)
+  out <- rep(NA, new_length)
+  ii <- 1
+  for (el in v) {
+    if (el == 0) {
+      out[ii] <- 1
+      ii <- ii + 1
+    } else if (n_digits(el) %% 2 == 0) {
+      out[c(ii, ii+1)] <- n_split(el)
+      ii <- ii + 2
+    } else {
+      out[ii] <- el*2024
+      ii <- ii + 1
+    }
+  }
+  out
+}
+
+#d11_1_answer <- length(reapply(blink, d11, 25))
+
+d11_df <- tibble(val = d11, n=1) %>% group_by(val) %>% 
+  summarize(n = sum(n))
+
+blink_2 <- function(df) {
+  df <- df %>% mutate(digits = n_digits(val), even = digits %% 2 == 0)
+  even <- filter(df, even)
+  odd <- filter(df, !even) %>% select(val, n)
+  
+  new_vals_1 <- even %>% mutate(val = n_split_1(val, digits)) %>% select(val, n)
+  new_vals_2 <- even %>% mutate(val = n_split_2(val, digits)) %>% select(val, n)
+  
+  mutate(odd,
+    val = case_when(
+      val == 0 ~ 1,
+      T ~ val*2024
+    )) %>% 
+    add_row(new_vals_1) %>% 
+    add_row(new_vals_2) %>% 
+    group_by(val) %>% 
+    summarize(n = sum(n))
+}
+
+d11_1_answer <- sum(reapply(blink_2, d11_df, 25)$n)
+d11_2_answer <- sum(reapply(blink_2, d11_df, 75)$n)
