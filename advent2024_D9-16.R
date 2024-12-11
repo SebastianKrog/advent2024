@@ -183,18 +183,14 @@ d10_2_answer <- sum(d10_th_ratings)
 d11 <- "125 17" |> str_split_1(" ") |> as.numeric()
 d11 <- readLines("data/day_11/input.txt") |> str_split_1(" ") |> as.numeric()
 
+d11_df <- tibble(val = d11, n=1) %>% group_by(val) %>% 
+  summarize(n = sum(n))
+
 n_digits <- function(x) {
   case_when(
     x == 0 ~ 1,
     T ~ floor(log10(x)) + 1
   )
-}
-
-n_split <- function(x) {
-  # could be faster as floor(n/0.5digits) and (n/0.5digits) %% 1 * 0.5digits
-  str <- as.character(x) |> str_split_1("")
-  c(paste(head(str, length(str)/2), collapse=""),
-    paste(tail(str, length(str)/2), collapse="")) |> as.numeric()
 }
 
 n_split_1 <- function(x, digits) {
@@ -206,30 +202,6 @@ n_split_2 <- function(x, digits) {
   decimal <- x/half_d
   round(half_d * (decimal - trunc(decimal)))
 }
-
-blink <- function(v) {
-  new_length <- length(v) + sum(n_digits(v) %% 2 == 0)
-  out <- rep(NA, new_length)
-  ii <- 1
-  for (el in v) {
-    if (el == 0) {
-      out[ii] <- 1
-      ii <- ii + 1
-    } else if (n_digits(el) %% 2 == 0) {
-      out[c(ii, ii+1)] <- n_split(el)
-      ii <- ii + 2
-    } else {
-      out[ii] <- el*2024
-      ii <- ii + 1
-    }
-  }
-  out
-}
-
-#d11_1_answer <- length(reapply(blink, d11, 25))
-
-d11_df <- tibble(val = d11, n=1) %>% group_by(val) %>% 
-  summarize(n = sum(n))
 
 blink_2 <- function(df) {
   df <- df %>% mutate(digits = n_digits(val), even = digits %% 2 == 0)
