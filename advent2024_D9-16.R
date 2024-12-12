@@ -121,6 +121,17 @@ d10_input <- readLines("data/day_10/input.txt")
 # 01329801
 # 10456732" |> str_split_1("\n")
 
+# For all practical purposes, this means that a hiking trail is any path that
+# starts at height 0, ends at height 9, and always increases by a height of
+# exactly 1 at each step.
+
+# A trailhead is any position that starts one or more hiking trails - here, 
+# these positions will always have height 0. Assembling more fragments of pages,
+# you establish that a trailhead's score is the number of 9-height positions
+# reachable from that trailhead via a hiking trail.
+
+# What is the sum of the scores of all trailheads on your topographic map?
+
 d10 <- read_map_df(d10_input, fun=as.numeric)
 
 d10_m <- read_map_matrix(d10_input, fun=as.numeric)
@@ -134,7 +145,7 @@ trailhead_score <- function(x, y, mat, unique = T) {
     if (x > ncol(mat)) return(c())
     if (y > nrow(mat)) return(c())
     if (mat[y, x] != value) return(c())
-    if (value == 9) return(x+y*ncol(mat))
+    if (value == 9) return(x+y*ncol(mat)) # Calc. unique number based on xy
     return(c(
       trailhead_count(x, y-1, value+1),
       trailhead_count(x, y+1, value+1),
@@ -154,8 +165,11 @@ d10_th_scores <- mapply(
 
 d10_1_answer <- sum(d10_th_scores)
 
+# The paper describes a second way to measure a trailhead called its rating. A 
+# trailhead's rating is the number of distinct hiking trails which begin at
+# that trailhead.
 
-# PART 2
+# What is the sum of the ratings of all trailheads?
 
 d10_th_ratings <- mapply(
   function(x,y) {trailhead_score(x, y, d10_m, unique=F) },
@@ -203,7 +217,7 @@ n_split_2 <- function(x, digits) {
   round(half_d * (decimal - trunc(decimal)))
 }
 
-blink_2 <- function(df) {
+blink <- function(df) {
   df <- df %>% mutate(digits = n_digits(val), even = digits %% 2 == 0)
   even <- filter(df, even)
   odd <- filter(df, !even) %>% select(val, n)
@@ -222,5 +236,125 @@ blink_2 <- function(df) {
     summarize(n = sum(n))
 }
 
-d11_1_answer <- sum(reapply(blink_2, d11_df, 25)$n)
-d11_2_answer <- sum(reapply(blink_2, d11_df, 75)$n)
+d11_1_answer <- sum(reapply(blink, d11_df, 25)$n)
+d11_2_answer <- sum(reapply(blink, d11_df, 75)$n)
+
+
+# Day 12
+
+d12_input <- "RRRRIICCFF
+RRRRIICCCF
+VVRRRCCFFF
+VVRCCCJFFF
+VVVVCJJCFE
+VVIVCCJJEE
+VVIIICJJEE
+MIIIIIJJEE
+MIIISIJEEE
+MMMISSJEEE" |> str_split_1("\n")
+
+d12_input <- readLines("data/day_12/input.txt")
+
+# Due to "modern" business practices, the price of fence required for a region 
+# is found by multiplying that region's area by its perimeter. The total price 
+# of fencing all regions on a map is found by adding together the price of 
+# fence for every region on the map.
+
+# What is the total price of fencing all regions on your map?
+
+d12 <- read_map_matrix(d12_input)
+
+pl <- function(area, perimeter) {
+  c(area=area, perimeter=perimeter)
+}
+
+search_plot <- function(x, y, symbol, id) {
+  .search_plot <- function(x, y) {
+    if (x < 1 || y < 1 || x > ncol(d12) || y > nrow(d12)) return(pl(0,1))
+    if (d12[y,x] == as.character(id)) return(c())
+    if (d12[y,x] != symbol) return(pl(0,1))
+    d12[y,x] <<- id
+    return(rbind(
+      pl(1,0),
+      .search_plot(x + 1, y),
+      .search_plot(x, y + 1),
+      .search_plot(x - 1, y),
+      .search_plot(x, y - 1)
+    ))
+  }
+  as_tibble(rbind(.search_plot(x,y))) %>% summarize(
+    id = id,
+    symbol = symbol,
+    area = sum(area),
+    perimeter = sum(perimeter)
+  )
+}
+
+d12_df <- tibble(id = numeric(), symbol=character(),
+                 area = numeric(), perimeter = numeric())
+
+for (y in 1:nrow(d12)) {
+  for (x in 1:ncol(d12)) {
+    plot <- d12[y,x]
+    if (is.na(as.numeric(plot))) {
+      id <- max(0, d12_df$id) + 1
+      region <- search_plot(x,y,plot,id)
+      d12_df <- add_row(d12_df, region)
+    }
+  }
+}
+
+d12_1_answer <- sum(d12_df$area * d12_df$perimeter)
+
+# Under the bulk discount, instead of using the perimeter to calculate the
+# price, you need to use the number of sides each region has. Each straight
+# section of fence counts as a side, regardless of how long it is.
+
+d12_n <- d12
+class(d12_n) <- "numeric"
+
+d12_sides <- tibble(id=numeric())
+
+d12_clean_rows <- function(rows) {
+  arrange(rows, dist) %>% 
+    group_by(id) %>% 
+    mutate(
+      diff = dist - lag(dist) # All sides with diff == 1 are continuous
+    ) %>% ungroup() %>%
+    filter(!is.na(id), is.na(diff) | diff != 1) %>% 
+    select(id)
+}
+
+# We loop over both "sides" (lines) between each row/col of garden plots.
+for (y in 0:(nrow(d12_n))) {
+  # For the start and end we add an extra line
+  if (y == 0) id_1 <- NA else id_1 <- d12_n[y,]
+  if (y == nrow(d12_n)) id_2 <- NA else id_2 <- d12_n[y+1,]
+  
+  # There are only fences between different (ie. dissimilar) plot ids
+  dissimilar = !(id_1 == id_2) | is.na(id_1) | is.na(id_2)
+  dist <- (1:ncol(d12_n))[dissimilar]
+  
+  rows_1 <- tibble(dist, id = id_1[dissimilar]) |> d12_clean_rows()
+  rows_2 <- tibble(dist, id = id_2[dissimilar]) |> d12_clean_rows()
+  d12_sides <- add_row(d12_sides, rbind(rows_1, rows_2))
+}
+
+# In both directions
+for (x in 0:(ncol(d12))) {
+  if (x == 0) id_1 <- NA else id_1 <- d12_n[,x]
+  if (x == nrow(d12_n)) id_2 <- NA else id_2 <- d12_n[,x+1]
+  
+  dissimilar = !(id_1 == id_2) | is.na(id_1) | is.na(id_2)
+  dist <- (1:nrow(d12_n))[dissimilar]
+  
+  rows_1 <- tibble(dist, id = id_1[dissimilar]) |> d12_clean_rows()
+  rows_2 <- tibble(dist, id = id_2[dissimilar]) |> d12_clean_rows()
+  d12_sides <- add_row(d12_sides, rbind(rows_1, rows_2))
+}
+
+d12_total_sides <- d12_sides %>% 
+  count(id) %>%
+  left_join(d12_df, by="id")
+
+d12_2_answer <- sum(d12_total_sides$area * d12_total_sides$n)

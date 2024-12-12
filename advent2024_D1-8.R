@@ -571,35 +571,6 @@ d8_1_answer <- nrow(d8_antinodes)
 # at the position of each antenna (unless that antenna is the only one of its 
 # frequency).
 
-d8_an_m <- matrix(F, ncol=d8_bounds[[1]], nrow=d8_bounds[[2]])
-
-d8_antinode_any <- tibble()
-
-for (i in 1:nrow(d8_pairs)) {
-  base_x <- d8_pairs$x_V1[[i]]
-  base_y <- d8_pairs$y_V2[[i]]
-  diff_x <- abs(d8_pairs$diff_x[[i]])
-  diff_y <- abs(d8_pairs$diff_y[[i]])
-  #if (diff_x == 0) {} # Not in data
-  #if (diff_y == 0) {}
-  pos_x <- c(rev(seq(base_x, 1, -diff_x)), tail(seq(base_x, d8_bounds[[1]], diff_x), -1))
-  pos_y <- c(rev(seq(base_y, 1, -diff_y)), tail(seq(base_y, d8_bounds[[1]], diff_y), -1))
-  
-  # lag to add
-  x_i <- which(pos_x==base_x)
-  y_i <- which(pos_y==base_y)
-  
-  if (length(pos_y) > length(pos_x)) {
-    pos_y <- head(lead(pos_y, y_i-x_i), length(pos_x))
-  } else if (length(pos_x) > length(pos_y)) {
-    pos_x <- head(lead(pos_x, x_i-y_i), length(pos_y))
-  }
-  
-  for (j in 1:length(pos_x)) {
-    d8_an_m[pos_x[[j]],pos_y[[j]]] <- T
-  }
-}
-
 d8_antinode_any <- tibble(x = NA, y=NA)
 for (i in 1:nrow(d8_pairs)) {
   x2 <- d8_pairs$x_V2[[i]]
