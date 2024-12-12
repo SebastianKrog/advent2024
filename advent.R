@@ -1,4 +1,5 @@
 library(tidyverse)
+source("utils.R")
 
 # DAY 1
 
@@ -513,4 +514,105 @@ d7_2_answer <- sum(d7_test_values[which(d7_2_valid)])
 
 # DAY 8
 
+d8_input <- "............
+........0...
+.....0......
+.......0....
+....0.......
+......A.....
+............
+............
+........A...
+.........A..
+............
+............" |> str_split_1("\n")
 
+d8_input <- readLines("data/day_8/input.txt")
+
+d8_bounds <- c(nchar(d8_input[1]),length(d8_input))
+
+d8_df <- read_map_df(d8_input)
+
+find_combinations <- function(coords) {
+  as_tibble(t(combn(coords,2)))
+}
+
+d8_pairs <- d8_df %>% 
+  group_by(symbol) %>% 
+  reframe(x = find_combinations(x), y=find_combinations(y)) %>% 
+  unnest(c(x,y), names_sep = "_") %>% mutate(
+    diff_x = x_V1 - x_V2,
+    diff_y = y_V1 - y_V2,
+  )
+
+d8_an_pairs <- d8_pairs %>% mutate(
+    antinode_x1 = x_V1 + diff_x,
+    antinode_y1 = y_V1 + diff_y,
+    antinode_x2 = x_V2 - diff_x,
+    antinode_y2 = y_V2 - diff_y
+  ) %>% select(symbol, starts_with("antinode"))
+
+d8_antinodes <- tibble(
+  x=c(d8_an_pairs$antinode_x1, d8_an_pairs$antinode_x2),
+  y=c(d8_an_pairs$antinode_y1, d8_an_pairs$antinode_y2)
+) %>% filter(
+  x > 0,
+  y > 0,
+  x <= d8_bounds[[1]],
+  y <= d8_bounds[[2]]
+) %>% distinct(x, y) %>% 
+  mutate(symbol = "#")
+
+d8_1_answer <- nrow(d8_antinodes)
+
+# After updating your model, it turns out that an antinode occurs at any grid 
+# position exactly in line with at least two antennas of the same frequency, 
+# regardless of distance. This means that some of the new antinodes will occur 
+# at the position of each antenna (unless that antenna is the only one of its 
+# frequency).
+
+d8_an_m <- matrix(F, ncol=d8_bounds[[1]], nrow=d8_bounds[[2]])
+
+d8_antinode_any <- tibble()
+
+for (i in 1:nrow(d8_pairs)) {
+  base_x <- d8_pairs$x_V1[[i]]
+  base_y <- d8_pairs$y_V2[[i]]
+  diff_x <- abs(d8_pairs$diff_x[[i]])
+  diff_y <- abs(d8_pairs$diff_y[[i]])
+  #if (diff_x == 0) {} # Not in data
+  #if (diff_y == 0) {}
+  pos_x <- c(rev(seq(base_x, 1, -diff_x)), tail(seq(base_x, d8_bounds[[1]], diff_x), -1))
+  pos_y <- c(rev(seq(base_y, 1, -diff_y)), tail(seq(base_y, d8_bounds[[1]], diff_y), -1))
+  
+  # lag to add
+  x_i <- which(pos_x==base_x)
+  y_i <- which(pos_y==base_y)
+  
+  if (length(pos_y) > length(pos_x)) {
+    pos_y <- head(lead(pos_y, y_i-x_i), length(pos_x))
+  } else if (length(pos_x) > length(pos_y)) {
+    pos_x <- head(lead(pos_x, x_i-y_i), length(pos_y))
+  }
+  
+  for (j in 1:length(pos_x)) {
+    d8_an_m[pos_x[[j]],pos_y[[j]]] <- T
+  }
+}
+
+d8_antinode_any <- tibble(x = NA, y=NA)
+for (i in 1:nrow(d8_pairs)) {
+  x2 <- d8_pairs$x_V2[[i]]
+  y2 <- d8_pairs$y_V2[[i]]
+  diff_x <- d8_pairs$diff_x[[i]]
+  diff_y <- d8_pairs$diff_y[[i]]
+  a <- diff_y/diff_x
+  b <- y2 - a * x2
+  
+  points <- tibble(x = 1:d8_bounds[[1]], y=round(x*a+b,4)) %>% 
+    filter(y-floor(y) < 0.01, y >= 1, y <= d8_bounds[[2]])
+  
+  d8_antinode_any <- d8_antinode_any %>% add_row(points)
+}
+
+d8_2_answer <- d8_antinode_any |> distinct(x, y) |> nrow() - 1
