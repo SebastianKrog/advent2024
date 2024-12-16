@@ -358,3 +358,168 @@ d12_total_sides <- d12_sides %>%
   left_join(d12_df, by="id")
 
 d12_2_answer <- sum(d12_total_sides$area * d12_total_sides$n)
+
+
+# Day 15
+
+d15_input <- "##########
+#..O..O.O#
+#......O.#
+#.OO..O.O#
+#..O@..O.#
+#O#..O...#
+#O..O..O.#
+#.OO.O.OO#
+#....O...#
+##########
+
+<vv>^<v^>v>^vv^v>v<>v^v<v<^vv<<<^><<><>>v<vvv<>^v^>^<<<><<v<<<v^vv^v>^
+vvv<<^>^v^^><<>>><>^<<><^vv^^<>vvv<>><^^v>^>vv<>v<<<<v<^v>^<^^>>>^<v<v
+><>vv>v^v^<>><>>>><^^>vv>v<^^^>>v^v^<^^>v^^>v^<^v>v<>>v^v^<v>v^^<^^vv<
+<<v<^>>^^^^>>>v^<>vvv^><v<<<>^^^vv^<vvv>^>v<^^^^v<>^>vvvv><>>v^<<^^^^^
+^><^><>>><>^^<<^^v>>><^<v>^<vv>>v>>>^v><>^v><<<<v>>v<v<v>vvv>^<><<>^><
+^>><>^v<><^vvv<^^<><v<<<<<><^v<<<><<<^^<v<^^^><^>>^<v^><<<^>>^v<v^v<v^
+>^>>^v>vv>^<<^v<>><<><<v<<v><>v<^vv<<<>^^v^>^^>>><<^v>>v^v><^^>>^<>vv^
+<><^^>^^^<><vvvvv^v<v<<>^v<v>v<<^><<><<><<<^^<<<^<<>><<><^^^>^^<>^>v<>
+^^>vv<^v^v<vv>^<><v<^v>^^^>>>^^vvv^>vvv<>>>^<^>>>>>^<<^v>^vvv<>^<><<v>
+v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^"
+
+d15_input <- readLines("data/day_15/input.txt") |> paste0(collapse="\n")
+
+d15_split <- d15_input |> str_split_1("\n\n")
+
+d15_moves <- d15_split[[2]] |> str_split_1("")
+d15_moves <- d15_moves[!d15_moves == "\n"]
+
+d15 <- d15_split[[1]] |> str_split_1("\n")
+d15_df <- read_map_df(d15)
+d15_m <- read_map_matrix(d15)
+
+d15_start <- d15_df %>% filter(symbol=="@") %>% select(x,y) %>% as.list()
+
+moves <- c("<", "^", ">", "v")
+dirs <- list(
+  list(x=-1,y=0),
+  list(x=0,y=-1),
+  list(x=1,y=0),
+  list(x=0,y=+1)
+)
+
+get_dir <- function(d) dirs[which(moves==d)][[1]]
+
+d15_m[d15_start$y, d15_start$x] <- "."
+
+find_next_free_space <- function(pos, move, mat) {
+  check_pos <- pos
+  while (T) {
+    check_pos <- mapply(`+`, check_pos, get_dir(move)) |> as.list()
+    check_found <- mat[check_pos$y, check_pos$x]
+    if (check_found == "#") { return(NULL) }
+    if (check_found == ".") { return(check_pos) }
+  }
+}
+
+cur_pos <- d15_start
+for (move in d15_moves) {
+  next_pos <- mapply(`+`,cur_pos, get_dir(move)) |> as.list()
+  next_found <- d15_m[next_pos$y, next_pos$x] 
+  if (next_found == "#") {
+    next
+  }
+  if (next_found == ".") {
+    cur_pos <- next_pos
+    next
+  }
+  if (next_found == "O") {
+    next_free_space <- find_next_free_space(next_pos, move, d15_m)
+    if (!is.null(next_free_space)) {
+      cur_pos <- next_pos
+      d15_m[next_pos$y, next_pos$x] <- "."
+      d15_m[next_free_space$y, next_free_space$x] <- "O"
+    }
+  }
+}
+
+d15_out_df <- map_matrix_to_df(d15_m)
+
+d15_1_answer <- d15_out_df %>% 
+  filter(symbol=="O") %>% 
+  mutate(
+    score = 100*(y-1)+x-1
+  ) %>% summarise(sum(score)) %>% pull()
+
+
+d15_m <- read_map_matrix(d15)
+
+d15_m2 <- matrix(nrow=nrow(d15_m), ncol=ncol(d15_m)*2)
+for (row in 1:nrow(d15_m)) {
+  for (col in 1:ncol(d15_m)) {
+    space <- d15_m[row, col]
+    if (space == ".") {
+      d15_m2[row,col*2-1] <- "."
+      d15_m2[row,col*2] <- "."
+    }
+    if (space == "#") {
+      d15_m2[row,col*2-1] <- "#"
+      d15_m2[row,col*2] <- "#"
+    }
+    if (space == "O") {
+      d15_m2[row,col*2-1] <- "["
+      d15_m2[row,col*2] <- "]"
+    }
+    if (space == "@") {
+      d15_m2[row,col*2-1] <- "."
+      d15_start <- list(x = 2*col-1, y=row)
+      d15_m2[row,col*2] <- "."
+    }
+  }
+}
+
+move_boxes <- function(pos, move, prev, prev2, test=T) {
+  pos_2 <- pos
+  pos_2$x <- pos$x +1
+  
+  next_pos <- mapply(`+`,cur_pos, get_dir(move)) |> as.list()
+  if (d15_2[next_pos$y,next_pos$x] == d15_2[pos$y,pos$x]) { # stacked
+    if (!test) { #CONTINUE HERE
+      d15_2[pos$y,pos$x] = prev
+      d15_2[pos_2$y,pos_2$x] = prev2
+    }
+    return(move_boxes(next_pos, move, prev="[", prev2="]", d15_2))
+  }
+  
+}
+
+cur_pos <- d15_start
+for (move in d15_moves) {
+  next_pos <- mapply(`+`,cur_pos, get_dir(move)) |> as.list()
+  next_found <- d15_m2[next_pos$y, next_pos$x] 
+  if (next_found == "#") {
+    next
+  }
+  if (next_found == ".") {
+    cur_pos <- next_pos
+    next
+  }
+  if (next_found %in% c("[", "]")) {
+    if (move == ">") { # [
+      next_free_space <- find_next_free_space(next_pos, move, d15_m2)
+      if (!is.null(next_free_space)) {
+        x = (cur_pos$x):(next_free_space$x-1)
+        cur_found = d15_m2[cur_pos$y, x+1] <- d15_m2[cur_pos$y, x]
+        cur_pos <- next_pos
+      }
+    } else if (move == "<") { # [
+      next_free_space <- find_next_free_space(next_pos, move, d15_m2)
+      if (!is.null(next_free_space)) {
+        x = (cur_pos$x):(next_free_space$x+1)
+        cur_found = d15_m2[cur_pos$y, x-1] <- d15_m2[cur_pos$y, x]
+        cur_pos <- next_pos
+      }
+    } else {
+      box_pos <- next_move
+      if (next_found == "]") box_pos$x <- next_move$x-1
+      can_move <- move_boxes(box_pos, move, ".", T)
+    }
+  }
+}
