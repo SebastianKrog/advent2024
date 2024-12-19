@@ -90,6 +90,6 @@ reapply <- function(fun, init, n) {
 
 
 matches_to_df <- function(matches, fun=identity) {
-  reduce(d14_match, rbind) |> data.frame() |> as.tibble() |> 
+  reduce(matches, rbind) |> data.frame() |> as.tibble() |> 
     select(-V1) |> mutate_all(fun)
 }
