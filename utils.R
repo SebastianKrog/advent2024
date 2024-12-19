@@ -31,12 +31,21 @@ read_map_matrix <- function(input, fun=identity) {
 }
 
 print_map_df <- function(
-  df, symbol="symbol", background=".", width=max(df$x), height=max(df$y)) {
+  df, symbol="symbol", background=".",
+  width=max(df$x),
+  height=max(df$y),
+  count=F,
+  base_zero=F
+) {
+  if (base_zero) one_less <- 1 else one_less <- 0
   for (y_i in 1:height) {
     l <- rep(background, width)
     for (x_i in 1:width) {
-      found <- filter(df, x==x_i, y==y_i)
-      if (nrow(found) > 0) l[[x_i]] <- as.character(pull(found, symbol))
+      found <- filter(df, x==x_i-one_less, y==y_i-one_less)
+      if (nrow(found) > 0) {
+        if (count) l[[x_i]] <- as.character(nrow(found))
+        else l[[x_i]] <- head(as.character(pull(found, symbol)), 1)
+      }
     }
     cat(paste(l, collapse=""), "\n")
   }
@@ -79,3 +88,8 @@ reapply <- function(fun, init, n) {
   out
 }
 
+
+matches_to_df <- function(matches, fun=identity) {
+  reduce(d14_match, rbind) |> data.frame() |> as.tibble() |> 
+    select(-V1) |> mutate_all(fun)
+}

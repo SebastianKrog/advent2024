@@ -435,6 +435,80 @@ d13_prices2 <- mapply(
 d13_2_answer <- sum(d13_prices2)
 
 
+# Day 14
+
+d14_input <- "p=0,4 v=3,-3
+p=6,3 v=-1,-3
+p=10,3 v=-1,2
+p=2,0 v=2,-1
+p=0,0 v=1,3
+p=3,0 v=-2,-2
+p=7,6 v=-1,-3
+p=3,0 v=-1,-2
+p=9,3 v=2,3
+p=7,3 v=-1,2
+p=2,4 v=2,-3
+p=9,5 v=-3,-3" |> str_split_1("\n")
+
+#d14_input <- "p=2,4 v=2,-3" |> str_split_1("\n")
+
+d14_input <- read_lines("data/day_14/input.txt")
+
+d14_match_str <- "p=(?<x>\\d+),(?<y>\\d+) v=(?<vx>-?\\d+),(?<vy>-?\\d+)"
+d14_match <- str_match_all(d14_input, d14_match_str)
+d14_df <- matches_to_df(d14_match, as.numeric)
+
+tick <- function(df, xlim = 101, ylim = 103) {
+  xlim <- xlim - 1
+  ylim <- ylim - 1
+  df %>% mutate(
+    x = x + vx,
+    y = y + vy
+  ) %>% mutate(
+    x = case_when(x > xlim ~ x - xlim - 1, x < 0 ~ xlim + x + 1, T ~ x),
+    y = case_when(y > ylim ~ y - ylim - 1, y < 0 ~ ylim + y + 1, T ~ y)
+  )
+}
+
+quad_count <- function(df, xlim = 101, ylim = 103) {
+  xlim <- xlim - 1
+  ylim <- ylim - 1
+  df %>% mutate(
+    left = x < xlim/2,
+    right = x > xlim/2,
+    top = y < ylim/2,
+    bottom = y > ylim/2,
+    s_tl = top & left,
+    s_tr = top & right,
+    s_bl = bottom & left,
+    s_br = bottom & right
+  ) |> summarize_at(vars(starts_with("s_")), .funs=sum)
+}
+
+d14_1_answer <- quad_count(reapply(tick, d14_df, 100)) |> prod()
+
+i <- 0
+d14_df_search <- d14_df
+robot_count <- 0
+look_for_xmas_tree <- function() {
+  .search <- function() {
+    d14_df_search <<- tick(d14_df_search)
+    robot_count <<- d14_df_search |> count(x, y) |> filter(n>1) |> nrow()
+    if (robot_count < 1) {
+      #print_map_df(d14_df_search, count = T, base_zero = T)
+      search <<- F
+    }
+  }
+  search <- T
+  while(search) {
+    i <<- i + 1
+    .search()
+    #print(robot_count)
+  }
+}
+
+d14_2_answer <- i
+
 # Day 15
 
 d15_input <- "##########
