@@ -440,13 +440,15 @@ for (move in d15_moves) {
   }
 }
 
-d15_out_df <- map_matrix_to_df(d15_m)
+d15_calc_gps <- function(mat) {
+  map_matrix_to_df(mat) %>% 
+    filter(symbol %in% c("O", "[")) %>% 
+    mutate(
+      score = 100*(y-1)+x-1
+    ) %>% summarise(sum(score)) %>% pull()
+}
 
-d15_1_answer <- d15_out_df %>% 
-  filter(symbol=="O") %>% 
-  mutate(
-    score = 100*(y-1)+x-1
-  ) %>% summarise(sum(score)) %>% pull()
+d15_1_answer <- d15_calc_gps(d15_m)
 
 
 d15_m <- read_map_matrix(d15)
@@ -475,19 +477,46 @@ for (row in 1:nrow(d15_m)) {
   }
 }
 
-move_boxes <- function(pos, move, prev, prev2, test=T) {
+move_dir <- function(pos, dir) {
+  mapply(`+`,pos, get_dir(dir)) |> as.list()
+}
+
+move_boxes <- function(pos, move, test=T) {
   pos_2 <- pos
   pos_2$x <- pos$x +1
   
-  next_pos <- mapply(`+`,cur_pos, get_dir(move)) |> as.list()
-  if (d15_2[next_pos$y,next_pos$x] == d15_2[pos$y,pos$x]) { # stacked
-    if (!test) { #CONTINUE HERE
-      d15_2[pos$y,pos$x] = prev
-      d15_2[pos_2$y,pos_2$x] = prev2
-    }
-    return(move_boxes(next_pos, move, prev="[", prev2="]", d15_2))
+  next_pos <- move_dir(pos, move)
+  next_found <- d15_m2[next_pos$y,next_pos$x]
+  
+  next_pos_2 <- next_pos
+  next_pos_2$x <- next_pos$x + 1
+  next_found_2 <- d15_m2[next_pos_2$y,next_pos_2$x]
+  
+  if (next_found == "#" || next_found_2 == "#") return(F)
+  
+  if (next_found == d15_m2[pos$y,pos$x]) { # stacked
+    out <- move_boxes(next_pos, move, test)
+  } else if (next_found == "." && next_found_2 == ".") {
+    out <- T
+  } else {
+    out <- all(
+      if (next_found == "]") {
+        move_boxes(move_dir(next_pos, "<"), move, test)
+      } else T,
+      if (next_found_2 == "[") {
+        move_boxes(next_pos_2, move, test)
+      } else T
+    )
   }
   
+  if (test==F) {
+    d15_m2[pos$y,pos$x] <<- "."
+    d15_m2[pos_2$y,pos_2$x] <<- "."
+    d15_m2[next_pos$y,next_pos$x] <<- "["
+    d15_m2[next_pos_2$y,next_pos_2$x] <<- "]"
+  }
+  
+  return(out)
 }
 
 cur_pos <- d15_start
@@ -517,9 +546,15 @@ for (move in d15_moves) {
         cur_pos <- next_pos
       }
     } else {
-      box_pos <- next_move
-      if (next_found == "]") box_pos$x <- next_move$x-1
-      can_move <- move_boxes(box_pos, move, ".", T)
+      box_pos <- next_pos
+      if (next_found == "]") box_pos$x <- next_pos$x-1
+      can_move <- move_boxes(box_pos, move, T)
+      if (can_move) {
+        move_boxes(box_pos, move, F)
+        cur_pos <- next_pos
+      }
     }
   }
 }
+
+d15_2_answer <- d15_calc_gps(d15_m2)

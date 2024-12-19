@@ -42,6 +42,31 @@ print_map_df <- function(
   }
 }
 
+map_matrix_to_df <- function(mat, ignore=".", fun=identity) {
+  max_size <- prod(dim(mat))
+  l_x <- rep(NA, max_size)
+  l_y <- rep(NA, max_size)
+  l_symbol <- rep(NA, max_size)
+  
+  i <- 1
+  for (y in 1:nrow(mat)) {
+    for (x in 1:ncol(mat)) {
+      if (!mat[y,x] %in% ignore) {
+        l_x[[i]] <- x
+        l_y[[i]] <- y
+        l_symbol[[i]] <- fun(mat[y,x])
+        i <- i + 1
+      }
+    }
+  }
+  
+  l_x <- l_x[!is.na(l_x)]
+  l_y <- l_y[!is.na(l_y)]
+  l_symbol <- l_symbol[!is.na(l_symbol)]
+  
+  tibble(x=l_x, y=l_y, symbol=l_symbol)
+}
+
 reapply <- function(fun, init, n) {
   if (n == 1) return(fun(init))
   cli::cli_progress_bar("Reapplying...", total=n)
