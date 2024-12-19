@@ -360,6 +360,81 @@ d12_total_sides <- d12_sides %>%
 d12_2_answer <- sum(d12_total_sides$area * d12_total_sides$n)
 
 
+# Day 13
+
+
+d13_input <- "Button A: X+94, Y+34
+Button B: X+22, Y+67
+Prize: X=8400, Y=5400
+
+Button A: X+26, Y+66
+Button B: X+67, Y+21
+Prize: X=12748, Y=12176
+
+Button A: X+17, Y+86
+Button B: X+84, Y+37
+Prize: X=7870, Y=6450
+
+Button A: X+69, Y+23
+Button B: X+27, Y+71
+Prize: X=18641, Y=10279" |> str_split_1("\n")
+
+d13_input <- read_lines("data/day_13/input.txt")
+
+d13_matches <- str_match_all(d13_input, "X.(\\d+), Y.(\\d+)") |> unlist() 
+d13_A_x <- d13_matches[which(1:length(d13_matches) %% 9 == 2)] |> as.numeric()
+d13_A_y <- d13_matches[which(1:length(d13_matches) %% 9 == 3)] |> as.numeric()
+d13_B_x <- d13_matches[which(1:length(d13_matches) %% 9 == 5)] |> as.numeric()
+d13_B_y <- d13_matches[which(1:length(d13_matches) %% 9 == 6)] |> as.numeric()
+d13_p_x <- d13_matches[which(1:length(d13_matches) %% 9 == 8)] |> as.numeric()
+d13_p_y <- d13_matches[which(1:length(d13_matches) %% 9 == 0)] |> as.numeric()
+
+smin <- function(x) {
+  if (length(x) == 0) return(numeric(0))
+  min(x)
+}
+
+calc_combs <- function(A_x, A_y, B_x, B_y, p_x, p_y) {
+  matches <- rep(NA, 101)
+  for (b in 0:101) {
+    nom1 <- p_y - b*B_y
+    nom2 <- p_x - b*B_x
+    price <- all(
+      nom1 %% A_y == 0,
+      nom2 %% A_x == 0,
+      nom1 / A_y  == nom2 / A_x
+    )
+    if (price) matches[b+1] <- nom1 / A_y
+  }
+  nas <- is.na(matches)
+  smin((0:100)[!nas]+3*matches[!nas])
+}
+
+d13_prices <- mapply(
+  calc_combs, d13_A_x, d13_A_y, d13_B_x, d13_B_y, d13_p_x, d13_p_y) |> unlist()
+
+d13_1_answer <- sum(d13_prices)
+
+calc_combs2 <- function(A_x, A_y, B_x, B_y, p_x, p_y) {
+  p_x <- p_x + 10000000000000
+  p_y <- p_y + 10000000000000
+  
+  # p_x = a*A_x + b*B_x
+  # p_y = a*A_y + b*B_y
+  
+  a <- (B_x*p_y - B_y*p_x)/(A_y*B_x - A_x*B_y)
+  b <- (A_x*p_y - A_y*p_x)/(A_x*B_y - A_y*B_x)
+  
+  if (near(a, floor(a)) & near(b, floor(b))) return(b+3*a)
+  logical(0)
+}
+
+d13_prices2 <- mapply(
+  calc_combs2, d13_A_x, d13_A_y, d13_B_x, d13_B_y, d13_p_x, d13_p_y) |> unlist()
+
+d13_2_answer <- sum(d13_prices2)
+
+
 # Day 15
 
 d15_input <- "##########
