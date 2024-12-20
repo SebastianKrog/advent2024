@@ -1,4 +1,5 @@
 library(tidyverse)
+#devtools::install_github('dirmeier/datastructures')
 library(astar) #devtools::install_github('machow/astar-r')
 source("utils.R")
 
@@ -68,7 +69,7 @@ path <- astar(start, goal, cost_estimate,
               hash_func = hash_func)
 
 calc_cost <- function(path) {
-  df <- reduce(path, rbind) |> data.frame() |> as.tibble() 
+  df <- reduce(path, rbind) |> data.frame() |> as_tibble() 
   moves <- df |> group_by(paste(x, y)) |> slice(1L) |> nrow() -1
   turns <- df |> mutate(diff = d - lag(d)) |> filter(diff != 0) |> nrow()
   moves+turns*1000
@@ -134,14 +135,23 @@ astar2 <- function(start, goal,
   # through that node (fscore)
   datastructures::insert(open_set, start_node$fscore, start_hash)
   
+  goal_out <- NULL
+  max_score <- Inf
+  
   while (!is.null(datastructures::peek(open_set))) {
     crnt <- search_nodes[[datastructures::pop(open_set)[[1]]]]
     
-    if (is_goal_reached(crnt$data, goal))
-      return(reconstruct_path(crnt))
+    if (is_goal_reached(crnt$data, goal)) {
+      if (is.null(goal_out)) goal_out <- crnt
+      if (crnt$gscore < max_score) max_score <- crnt$gscore
+      next
+    } else {
+      crnt$closed <- TRUE
+    }
     
+    if (crnt$gscore > max_score) next
+
     crnt$out_openset <- TRUE
-    crnt$closed <- TRUE
     
     # nodes need to be hashable
     for (neighbor in neighbors(crnt$data)) {
@@ -151,8 +161,6 @@ astar2 <- function(start, goal,
         neigh_node <- search_nodes[[indx]] <- make_search_node(neighbor, Inf, Inf)
       }
       
-      if (neigh_node$closed) next
-      
       # skip if this new path through neighbor has higher cost (to neighbor)
       tentative_gscore <- crnt$gscore + edge_distance(crnt$data, neigh_node$data)
       if (tentative_gscore > neigh_node$gscore) next
@@ -161,6 +169,8 @@ astar2 <- function(start, goal,
         neigh_node$came_from <- append(neigh_node$came_from, crnt)
         next
       }
+      
+      if (neigh_node$closed) next
       
       # update with new path, and estimated cost
       neigh_node$came_from <- list(crnt)
@@ -175,6 +185,7 @@ astar2 <- function(start, goal,
       
     }
   }
+  return(reconstruct_path(goal_out))
 }
 
 search_nodes = new.env()
@@ -183,7 +194,10 @@ visited_tiles <- astar2(start, goal, cost_estimate, edge_distance, neighbors,
                         is_goal_reached, hash_func = hash_func,
                         search_node_env = search_nodes)
 
-answer_2 <- length(visited_tiles)
+hash_simp <- \(n) paste(head(n, 2), collapse=".")
+
+answer_2 <- length(c(visited_tiles, hash_simp(start), hash_simp(goal)) |> 
+                     unique())
 
 # TMP
 
