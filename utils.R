@@ -93,3 +93,8 @@ matches_to_df <- function(matches, fun=identity) {
   reduce(matches, rbind) |> data.frame() |> as.tibble() |> 
     select(-V1) |> mutate_all(fun)
 }
+
+# This seems dirty! We can return from a different place in the stack!
+return_from <- function(value, envi) {
+  do.call("return", list(value), envir = envi)
+}
