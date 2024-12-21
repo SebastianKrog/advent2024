@@ -14,7 +14,7 @@ bwurrg
 brgr
 bbrgwb" |> str_split_1("\n")
 
-input <- read_lines("data/day_19/input.txt")
+#input <- read_lines("data/day_19/input.txt")
 
 colours <- c("w", "u", "b", "r", "g")
 
@@ -62,18 +62,127 @@ reduce_patterns <- function(patterns) {
     if (length(pat) == 1) next
     cur_pat[[i]] <- NA
     if (is.null(find_combination(pat, remove_na(cur_pat)))) cur_pat[[i]] <- pat
-    
   }
   remove_na(cur_pat)
 }
 
 red_pat <- reduce_patterns(patterns)
 
-answer_1 <- sum(designs |> 
-                  lapply(\(x) !is.null(find_combination(x, red_pat))) |>
-                  unlist())
+#answer_1 <- sum(designs |> 
+#                  lapply(\(x) !is.null(find_combination(x, red_pat))) |>
+#                  unlist())
 
 
 # Part 2
 # Yikes, astar and reducing the patterns won't work.
 
+library(memoise) # We need depth_first search with caching...
+
+# First, we should cache the match_finding.
+# We only need to keep track of number of combinations
+# Finally, we cache the count calculation on subpatterns
+
+longest_pattern <- patterns |> map(\(x) length(x)) |> unlist() |> max()
+# = 8 for full set and 3 for test
+
+.find_matches <- function(d) {
+  if (length(d) >= longest_pattern) return(find_matches(d, patterns))
+  find_matches(d, patterns[which(
+    unlist(lapply(patterns, \(p) length(p) <= length(d))))])
+}
+
+cache_find_matches <- memoise(.find_matches)
+
+c_find_matches <- function(design) {
+  des <- head(design, longest_pattern)
+  matches <- cache_find_matches(des)
+  lapply(matches, \(m) c(m, tail(design, -longest_pattern)))
+}
+
+find_combination2 <- function(design) {
+  neighbors <- \(n) cache_find_matches(n)
+  astar(design, numeric(0), cost_estimate, 
+        edge_distance, neighbors, is_goal_reached, 
+        hash_func = hash_func)
+}
+
+designs_valid <- designs |> 
+                  lapply(\(x) !is.null(find_combination2(x))) |>
+                  unlist()
+
+calc_combinations <- function(design) {
+  seen <- new.env()
+  
+  new_node <- function(data, came_from) {
+    env <- new.env()
+    env$data = data
+    #env$score = length(data)
+    if (is.null(came_from)) env$came_from = list()
+    else env$came_from = list(came_from)
+    env
+  }
+  
+  neighbors <- \(n) c_find_matches(n)
+  
+  crnt <- new_node(design, NULL)
+  seen[[hash_func(design)]] <- crnt
+  
+  .calc_comb <- function(crnt) {
+    for (neighbor in neighbors(crnt$data)) {
+      neigh_hash <- hash_func(neighbor)
+      neigh_search <- seen[[neigh_hash]]
+      if (is.null(neigh_search)) {
+        neigh_node <- new_node(neighbor, crnt)
+        seen[[neigh_hash]] <- neigh_node
+        .calc_comb(neigh_node)
+      } else {
+        # Check for unique?
+        neigh_search$came_from <- append(neigh_search$came_from, crnt) |>
+          unique()
+      }
+    }
+  }
+  
+  .reconstruct_path <- function(crnt) {
+    uniq <- new.env()
+    score <- 0
+    
+    .rec_path <- function(crnt, pscore) {
+      while(T) {
+        if (length(crnt$came_from)==0) {
+          score <<- score + pscore
+          break
+        }
+        hash <- hash_func(crnt$data)
+        if (!is.null(uniq[[hash]])) return()
+        uniq[[hash]] <- T
+        if (length(crnt$came_from) == 1) {
+          crnt <- first(crnt$came_from)
+        } else {
+          uniq_from <- 
+            crnt$came_from[which(
+              unlist(
+                lapply(crnt$came_from, 
+                       \(x) is.null(uniq[[hash_func(x$data)]]))))]
+          if (length(uniq_from) == 1) {
+            crnt <- first(uniq_from)
+          } else if  (length(uniq_from) > 1) {
+            p_new <- length(uniq_from)+pscore
+            walk(uniq_from, .rec_path, p_new)
+          }
+        }
+      }
+    }
+    
+    .rec_path(crnt, 0)
+    return(score)
+  }
+  
+  .calc_comb(crnt)
+  
+  #seen[["."]]
+  .reconstruct_path(seen[["."]])
+}
+
+sums <- designs[which(designs_valid)] |> lapply(calc_combinations) |> unlist()
+print(sums)
