@@ -51,6 +51,27 @@ print_map_df <- function(
   }
 }
 
+df_to_mat <- function(
+    df, symbol="symbol", background=".",
+    xmax=max(df$x),
+    ymax=max(df$y),
+    count=F,
+    base_zero=F
+) {
+  if (base_zero) one_less <- 1 else one_less <- 0
+  mat <- matrix(background, nrow=xmax+one_less, ncol=ymax+one_less)
+  for (y_i in 1:(ymax+one_less)) {
+    for (x_i in 1:(xmax+one_less)) {
+      found <- filter(df, x==x_i+one_less, y==y_i+one_less)
+      if (nrow(found) > 0) {
+        if (count) mat[y_i,x_i] <- as.character(nrow(found))
+        else mat[y_i,x_i] <- head(as.character(pull(found, symbol)), 1)
+      }
+    }
+  }
+  mat
+}
+
 map_matrix_to_df <- function(mat, ignore=".", fun=identity) {
   max_size <- prod(dim(mat))
   l_x <- rep(NA, max_size)
