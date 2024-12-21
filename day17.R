@@ -103,7 +103,7 @@ answer_1
 
 
 ## PART 2
-run_program <- function(a) {
+run_program <- function(a, test=T) {
   A <<- a
   B <<- 0
   C <<- 0
@@ -114,16 +114,19 @@ run_program <- function(a) {
     if (!read_op()) break
     i <- i + 1
   }
+  if (!test) return(output)
   if (identical(output, program)) return(T) else return(F)
 }
 
 # 5
-out <- function(combo) {
-  output <<- c(output, read_combo(combo) %% 8)
-  return(identical(output, head(program, length(output))))
+out2 <- function(combo) {
+  if (length(output) == length(program)) return(T)
+  new_out <- read_combo(combo) %% 8
+  output <<- c(output, new_out)
+  return(!identical(new_out, program[[length(output)]]))
 }
 
-x <- 10768062
+x <- 27278262
 y <- x
 while (y < x*10) {
   if (run_program(y)) {
@@ -133,3 +136,190 @@ while (y < x*10) {
 }
 
 answer_2
+
+
+
+x <- 27278262
+y <- x - 1
+while (y < x*10) {
+  y <- y + 1
+  if(first_out_one(i) != 1) next
+  A <- y
+  B <- 0
+  C <- 0
+  pointer <<- 0
+  output <<- c()
+  i <- 0
+  while(i < 1000) {
+    index <- pointer + 1
+    if (index > length(program)-1) break
+    operand <- program[index+1]
+    opcode <- program[index]
+    if (opcode == 0) A <- trunc(A/(2^read_combo(operand)))
+    if (opcode == 1) B <- bitwXor(B, operand)
+    if (opcode == 2) B <- read_combo(operand) %% 8
+    if (opcode == 3 && A != 0) pointer <<- operand - 2
+    if (opcode == 4) B <- bitwXor(B, C)
+    if (opcode == 5 && out2(operand)) break
+    if (opcode == 6) B <- trunc(A/(2^read_combo(operand)))
+    if (opcode == 7) C <- trunc(A/(2^read_combo(operand)))
+    pointer <- pointer + 2
+    i <- i + 1
+  }
+  if (identical(output, program)) {
+    answer_2 <- y
+    break
+  }
+}
+
+# Calc if first output == 2
+A <- x
+B <- 0
+C <- 0
+program <- c(2, 4, 1, 2, 7, 5, 4, 7, 1, 3, 5, 5, 0, 3, 3, 0)
+# 2 4
+B <- A %% 8
+# 1 2
+B <- bitwXor(B, 2)
+# 7 5
+C <- bitwShiftR(A,B) = trunc(A/(2^B))
+# 4 7
+B <- bitwXor(B, C)
+# 1 3
+B <- bitwXor(B, 3)
+# 5 5
+output B
+# 0 3
+A <- bitwShiftR(A,3)
+# 3 0
+goto start unless A = 0
+
+# Rewrite
+first_out <- function(a) {
+  bitwXor(bitwXor(bitwXor(a %% 8, 2), bitwShiftR(a, bitwXor(a %% 8, 2))), 3)
+}
+
+find_bits <- function(n, x) {
+  for (a in (0:2^6)+x) {
+    if (bitwXor(bitwXor(bitwXor(a %% 8, 2), bitwShiftR(a, bitwXor(a %% 8, 2))), 3) == n) return(a)
+  }
+  stop("Huh")
+}
+
+find_a <- function(program) {
+  output <- rev(program)
+  collect <- c()
+  x <- 0
+  for (i in 1:length(output)) {
+    next_out <- output[[i]]
+    num <- find_bits(next_out, x)
+    x <- bitwShiftR(num, 3)
+    collect <- c(num, collect)
+  }
+  collect
+}
+
+#first_out_one <- function(a) {
+#  b <- a %% 8
+#  bitwXor(bitwXor(b, 2), trunc(a/(2^bitwXor(b, 2))))
+#}
+
+i <- 0
+n <- 10000000
+found <- 0
+while (i<n) {
+  if(first_out_one(i) == 1) {
+    found <- found + 1
+    break
+  }
+  i <- i + 1
+}
+found/n
+
+
+
+# Reverse build the output.
+A = 0
+B = 0
+
+
+
+# Test bits
+bit_set <- c(2, 4, 1, 2, 7, 5, 4, 7, 1, 3, 5, 5, 0, 3, 3, 0)
+calc_bits <- 2^(3*(1:(length(bit_set))-1))*bit_set
+
+
+# LETS TRY AGAIN
+
+# Not for too big numbers...
+bit_list <- function(int) {
+  if (int == 0) return(c(0))
+  out <- c()
+  while(int > 0) {
+    out <- c(out, int %% 2)
+    int <- trunc(int/2)
+  }
+  out
+}
+
+bl2num <- function(bit_list) {
+  sum(2^(1:(length(bit_list))-1)*bit_list)
+}
+
+run_program_bl <- function(a) {
+  output <- c()
+  while(length(a) > 0) {
+    tmp <- c(a, 0, 0)
+    b <- head(tmp, 3)
+    b <- bitwXor(b, c(0, 1, 0))
+    tmp_b <- bl2num(b)
+    if (tmp_b == 0) c <- head(tmp, 3)
+    else if (length(a) < tmp_b) c <- c(0, 0, 0)
+    else c <- head(tail(tmp, -tmp_b), 3)
+    b <- bitwXor(b, c)
+    b <- bitwXor(b, c(1, 1, 0))
+    output <- c(output, bl2num(b))
+    a <- tail(a, -3)
+  }
+  output
+}
+
+find_a <- function(program) {
+  output <- rev(program)
+  a <- c()
+  for (o in output) {
+    for (n in 0:7) {
+      a_new <- head(c(bit_list(n), 0, 0), 3)
+      a_test <- c(a_new, a)
+      if (head(run_program_bl(a_test), 1) == o) {
+        a <- a_test
+        break
+      }
+      stop("NOT FOUND")
+    }
+    print(a)
+    print(run_program_bl(a))
+    print(" ")
+  }
+  a
+}
+
+find_A <- function(program) {
+  bitly <- \(n) head(c(bit_list(n), 0, 0), 3)
+  z_s <- lapply(0:7, bitly)
+  
+  .test <- function(a, test_out) {
+    l <- z_s |> lapply(\(x) c(x, a))
+    ll <- lapply(l, \(a_test) first(run_program_bl(a_test)) == test_out) |> unlist()
+    (l)[which(ll)]
+  }
+  
+  .find_A <- function(output, A, envi = parent.frame()) {
+    As <- .test(A, first(output))
+    if (length(As) == 0) return()
+    if (length(output) == 1) { do.call("return", list(first(As)), envir = envi) }
+    walk(As, function(a) { .find_A(tail(output, -1), a, envi) })
+  }
+  
+  .find_A(rev(program), c())
+}
