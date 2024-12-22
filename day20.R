@@ -36,14 +36,20 @@ hash_func <- \(n) paste0(n, collapse=".")
 neighbors <- function(n) {
   x <- n[[1]]
   y <- n[[2]]
-  list(
+  out <- list(
     if (mat[y,x+1] != "#") c(x + 1, y),
     if (mat[y,x-1] != "#") c(x - 1, y),
     if (mat[y+1,x] != "#") c(x, y + 1),
     if (mat[y-1,x] != "#") c(x, y - 1)
   ) |> discard(is.null)
+  mat[y,x+1] <<- "#" # Don't look back
+  mat[y,x-1] <<- "#"
+  mat[y+1,x] <<- "#"
+  mat[y-1,x] <<- "#"
+  out
 }
 
+# Using astar is a bit slow...
 path <- astar(start, goal, cost_estimate, 
               edge_distance, neighbors, is_goal_reached, 
               hash_func = hash_func)
@@ -76,6 +82,7 @@ cheats <- add_row(cheats_x, cheats_y) |>
 
 answer_1 <- cheats |> filter(cheat_score >= 100) |> count()
 
+# Part 2
 
 distance <- function(x1, y1, x2, y2) {
   abs(x2-x1)+abs(y2-y1)
@@ -84,13 +91,11 @@ distance <- function(x1, y1, x2, y2) {
 calc_cheats <- function(pos, pos_dist, limit = 100) {
   x1 <- pos[[1]]
   y1 <- pos[[2]]
-  # FIND CHEATS FROM POS
   found <- path_df |> 
     mutate(dist_to_pos = distance(x1, y1, x, y)) |> 
     filter(dist_to_pos <= 20, dist_to_pos > 0) |>
     mutate(time_saved = dist - pos_dist - dist_to_pos) |>
-    #filter(time_saved >= limit)
-    pull(time_saved)
+      pull(time_saved)
   sum(found >= limit)
 }
 
