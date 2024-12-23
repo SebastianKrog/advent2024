@@ -121,7 +121,8 @@ numpad_path <- function(src, dst) {
   # When going left and up, prioritize left when possible.
   if (!any(c("0", "A") %in% c(src, dst))) {
     if (np_col[np_dst] < np_col[np_src] & np_row[np_dst] < np_row[np_src]) .np_path2(np_src, np_dst)
-    else .np_path(np_src, np_dst)
+    else if (np_col[np_dst] > np_col[np_src] & np_row[np_dst] < np_row[np_src]) .np_path(np_src, np_dst)
+    else .np_path2(np_src, np_dst)
   }
   else if (dst %in% c("8", "5", "2")) .np_path2(np_src, np_dst)
   else if (src %in% c("7", "4", "1")) .np_path2(np_src, np_dst)
@@ -139,3 +140,23 @@ complexity <- function(code) {
 
 answer_1 <- sum(unlist(map(codes, complexity)) * num_input)
 
+
+# Part 2
+#calc_answer_2 <- function() {
+  dir_pad_edge_level <- memoise(function(src, dst, level) {
+    path <- dir_pad_edge_path(src, dst)
+    if (level == 1) return(length(path))
+    pmap(list(lag(path, 1, "A"), path), dir_pad_edge_level, level - 1) |> unlist() |> sum()
+  })
+  
+  complexity_level <- function(code, level=25) {
+    cp <- code_path(code)
+    pmap(list(lag(cp, 1, "A"), cp), dir_pad_edge_level, level) |> unlist() |> sum()
+  }
+  
+  answer_2 <- sum(unlist(map(codes, complexity_level)) * num_input)
+  answer_2
+#}
+
+# NOT 349855514937220 -- too high
+# NOT 137813495802036 -- too low
