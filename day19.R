@@ -116,7 +116,7 @@ calc_combinations <- function(design) {
   new_node <- function(data, came_from) {
     env <- new.env()
     env$data = data
-    #env$score = length(data)
+    env$score = NA
     if (is.null(came_from)) env$came_from = list()
     else env$came_from = list(came_from)
     env
@@ -178,6 +178,21 @@ calc_combinations <- function(design) {
     return(score)
   }
   
+  .calc_variations <- function(goal) {
+    goal$score <- 1
+    nodes <- c(goal)
+    score <- 0
+    while(length(nodes) > 0) {
+      pop <- first(nodes)
+      nodes <- tail(nodes, -1)
+      scores <- map(pop$came_from, \(x) x$score)
+      if (any(is.na(scores))) nodes <- c(nodes, pop)
+      else {
+        pop$score
+      }
+    }
+  }
+  
   .calc_comb(crnt)
   
   #seen[["."]]
@@ -186,3 +201,13 @@ calc_combinations <- function(design) {
 
 sums <- designs[which(designs_valid)] |> lapply(calc_combinations) |> unlist()
 print(sums)
+
+
+
+# rrbgbr 
+# "" -> r  -> bg -> \
+#         \-> b  -> g  -> br -> r
+#   \-> rb -> g  -> /  \-> b -> r -> r
+
+
+# 1 2 4 8
