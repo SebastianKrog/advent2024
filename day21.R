@@ -1,7 +1,5 @@
 library(tidyverse)
 source("utils.R")
-#devtools::install_github('dirmeier/datastructures')
-library(astar) #devtools::install_github('machow/astar-r')
 library(memoise)
 
 input <- "029A
