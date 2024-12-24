@@ -142,26 +142,21 @@ answer_1 <- sum(unlist(map(codes, complexity)) * num_input)
 
 
 # Part 2
-calc_answer_2 <- function() {
-  dir_pad_edge_level <- memoise(function(src, dst, level) {
-    path <- dir_pad_edge_path(src, dst)
-    if (level == 1) return(length(path))
-    pmap(list(lag(path, 1, "A"), path), dir_pad_edge_level, level - 1) |> unlist() |> sum()
-  })
-  
-  complexity_level <- function(code, level=25) {
-    cp <- code_path(code)
-    pmap(list(lag(cp, 1, "A"), cp), dir_pad_edge_level, level) |> unlist() |> sum()
-  }
-  
-  answer_2 <- sum(unlist(map(codes, complexity_level)) * num_input)
-  answer_2
+dir_pad_edge_level <- memoise(function(src, dst, level) {
+  path <- dir_pad_edge_path(src, dst)
+  if (level == 1) return(length(path))
+  pmap(list(lag(path, 1, "A"), path), dir_pad_edge_level, level - 1) |> unlist() |> sum()
+})
+
+complexity_level <- function(code, level=25) {
+  cp <- code_path(code)
+  pmap(list(lag(cp, 1, "A"), cp), dir_pad_edge_level, level) |> unlist() |> sum()
 }
 
-answer_2 <- calc_answer_2()
+answer_2 <- sum(unlist(map(codes, complexity_level)) * num_input)
+
 answer_2 |> format(scientific = F)
 
-answer_2 < 218309335714068
 
 # NOT 349855514937220 -- too high
 # NOT 137813495802036 -- too low
