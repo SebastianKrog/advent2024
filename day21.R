@@ -156,7 +156,3 @@ complexity_level <- function(code, level=25) {
 answer_2 <- sum(unlist(map(codes, complexity_level)) * num_input)
 
 answer_2 |> format(scientific = F)
-
-
-# NOT 349855514937220 -- too high
-# NOT 137813495802036 -- too low
