@@ -14,7 +14,7 @@ bwurrg
 brgr
 bbrgwb" |> str_split_1("\n")
 
-#input <- read_lines("data/day_19/input.txt")
+input <- read_lines("data/day_19/input.txt")
 
 colours <- c("w", "u", "b", "r", "g")
 
@@ -145,52 +145,34 @@ calc_combinations <- function(design) {
   
   .reconstruct_path <- function(crnt) {
     uniq <- new.env()
-    score <- 0
     
-    .rec_path <- function(crnt, pscore) {
+    .rec_path <- function(crnt) {
       while(T) {
         if (length(crnt$came_from)==0) {
-          score <<- score + pscore
-          break
+          crnt$score <- 1
+          return(1)
         }
         hash <- hash_func(crnt$data)
-        if (!is.null(uniq[[hash]])) return()
-        uniq[[hash]] <- T
-        if (length(crnt$came_from) == 1) {
-          crnt <- first(crnt$came_from)
-        } else {
-          uniq_from <- 
-            crnt$came_from[which(
-              unlist(
-                lapply(crnt$came_from, 
-                       \(x) is.null(uniq[[hash_func(x$data)]]))))]
-          if (length(uniq_from) == 1) {
-            crnt <- first(uniq_from)
-          } else if  (length(uniq_from) > 1) {
-            p_new <- length(uniq_from)+pscore
-            walk(uniq_from, .rec_path, p_new)
-          }
-        }
+        if (is.null(uniq[[hash]])) uniq[[hash]] <- T
+        
+        not_seen_before <- unlist(
+          lapply(crnt$came_from, 
+                 \(x) is.null(uniq[[hash_func(x$data)]])))
+        
+        uniq_from <- 
+          crnt$came_from[which(not_seen_before)]
+        
+        prev_score <- 
+          sum(map(crnt$came_from[which(!not_seen_before)], 
+                  \(x) x$score) |> unlist())
+    
+        score <- sum(map(uniq_from, .rec_path) |> unlist()) + prev_score
+        crnt$score <- score
+        return(score)
       }
     }
     
-    .rec_path(crnt, 0)
-    return(score)
-  }
-  
-  .calc_variations <- function(goal) {
-    goal$score <- 1
-    nodes <- c(goal)
-    score <- 0
-    while(length(nodes) > 0) {
-      pop <- first(nodes)
-      nodes <- tail(nodes, -1)
-      scores <- map(pop$came_from, \(x) x$score)
-      if (any(is.na(scores))) nodes <- c(nodes, pop)
-      else {
-        pop$score
-      }
-    }
+    return(.rec_path(crnt))
   }
   
   .calc_comb(crnt)
@@ -200,14 +182,5 @@ calc_combinations <- function(design) {
 }
 
 sums <- designs[which(designs_valid)] |> lapply(calc_combinations) |> unlist()
-print(sums)
 
-
-
-# rrbgbr 
-# "" -> r  -> bg -> \
-#         \-> b  -> g  -> br -> r
-#   \-> rb -> g  -> /  \-> b -> r -> r
-
-
-# 1 2 4 8
+answer_2 <- sum(sums)
